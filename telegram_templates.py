@@ -67,8 +67,6 @@ def msg_signal_update(
             f"{banner}\n"
             f"📊 {direction}  Score {score_str}  👀 WATCHING\n"
             f"Reason:  {reason}\n"
-            f"{_DIV}\n"
-            f"{chr(10).join(notes[:4])}\n"
             f"{news_line}"
             f"Next cycle in {cycle_minutes} min"
         )
