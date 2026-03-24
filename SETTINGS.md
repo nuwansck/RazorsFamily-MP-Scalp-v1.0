@@ -121,9 +121,17 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 | Key | Default | Description |
 |---|---|---|
 | `session_only` | `true` | `true` = only trade during London and US windows. `false` = trade any time (not recommended). |
-| `trading_day_start_hour_sgt` | `8` | Hour (SGT) when daily counters reset (trade count, loss count). |
+| `trading_day_start_hour_sgt` | `8` | Hour (SGT) when daily counters reset (trade count, loss count). Also used as the Monday market-open guard. |
 | `friday_cutoff_hour_sgt` | `23` | Stop trading on Friday after this hour SGT. |
+| `friday_cutoff_minute_sgt` | `0` | Minute past the Friday cutoff hour to stop trading. |
 | `cycle_minutes` | `5` | How often the bot runs its trade evaluation loop. Do not change unless testing. |
+| `london_session_start_hour` | `16` | London window open hour (SGT, inclusive). |
+| `london_session_end_hour` | `20` | London window close hour (SGT, inclusive). |
+| `us_session_start_hour` | `21` | US late window open hour (SGT, inclusive). |
+| `us_session_end_hour` | `23` | US late window close hour (SGT, inclusive). |
+| `us_session_early_end_hour` | `3` | US early-morning window close hour (SGT, inclusive). |
+| `dead_zone_start_hour` | `1` | Dead zone start — trade management only, no new entries (SGT). |
+| `dead_zone_end_hour` | `15` | Dead zone end hour (SGT, inclusive). |
 
 ---
 
@@ -152,7 +160,7 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 
 | Key | Default | Description |
 |---|---|---|
-| `calendar_refresh_interval_min` | `60` | Minutes between calendar fetches from Forex Factory. |
+| `calendar_fetch_interval_min` | `60` | Minutes between calendar fetches from Forex Factory. |
 | `calendar_retry_after_min` | `15` | Minutes to wait before retrying after a failed fetch. |
 | `calendar_prune_days_ahead` | `21` | Days ahead to keep events in the local cache. Events beyond this are pruned. |
 
@@ -162,9 +170,9 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 
 | Key | Default | Description |
 |---|---|---|
-| `xau_margin_rate_override` | `0.05` | Minimum margin rate for XAU/USD. Used as a floor — takes the higher of live OANDA rate and this value. `0.05` = 5% margin. |
 | `margin_safety_factor` | `0.6` | Fraction of free margin available for new trades. `0.6` = use at most 60% of free margin. |
 | `margin_retry_safety_factor` | `0.4` | Reduced safety factor used when retrying after a margin rejection. |
+| `margin_rate_override` | `0.0` | Override broker margin rate for all instruments. `0.0` = use live OANDA rate. |
 | `auto_scale_on_margin_reject` | `true` | Automatically reduce position size and retry if OANDA rejects due to insufficient margin. |
 | `telegram_show_margin` | `true` | Include margin details in Telegram trade alerts. |
 
@@ -179,6 +187,12 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 | `db_cleanup_hour_sgt` | `0` | Hour (SGT) when the daily database cleanup runs. |
 | `db_cleanup_minute_sgt` | `15` | Minute past the hour when cleanup runs. Default: 00:15 SGT. |
 | `db_vacuum_weekly` | `true` | Run SQLite VACUUM weekly (Sundays) to reclaim disk space. |
+| `daily_report_hour_sgt` | `15` | Hour (SGT, Mon–Fri) to send the daily performance Telegram report. |
+| `daily_report_minute_sgt` | `30` | Minute for the daily report. Default: 15:30 SGT (30 min before London open). |
+| `weekly_report_hour_sgt` | `8` | Hour (SGT, every Monday) to send the weekly performance report. |
+| `weekly_report_minute_sgt` | `15` | Minute for the weekly report. Default: 08:15 SGT. |
+| `monthly_report_hour_sgt` | `8` | Hour (SGT, first Monday of month) to send the monthly performance report. |
+| `monthly_report_minute_sgt` | `0` | Minute for the monthly report. Default: 08:00 SGT. |
 
 ---
 

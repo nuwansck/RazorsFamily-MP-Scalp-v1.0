@@ -2,22 +2,24 @@
   "bot_name": "RF Scalp v1.0 Multipair",
   "demo_mode": true,
   "enabled": true,
-
   "_comment_pairs": "Per-pair settings override any matching global key for that pair's cycle.",
   "pairs": {
     "GBP_USD": {
       "enabled": true,
       "pip_size": 0.0001,
-      "sl_pct": 0.0020,
-      "tp_pct": 0.0050,
+      "sl_pct": 0.002,
+      "tp_pct": 0.005,
       "rr_ratio": 2.5,
       "sl_mode": "pct_based",
       "tp_mode": "rr_multiple",
-      "sl_min_usd": 0.0010,
-      "sl_max_usd": 0.0040,
+      "sl_min_usd": 0.001,
+      "sl_max_usd": 0.004,
       "atr_sl_multiplier": 0.5,
       "max_spread_pips": 5,
-      "spread_limits": { "London": 4, "US": 5 },
+      "spread_limits": {
+        "London": 4,
+        "US": 5
+      },
       "max_concurrent_trades": 1
     },
     "EUR_USD": {
@@ -32,7 +34,10 @@
       "sl_max_usd": 0.0035,
       "atr_sl_multiplier": 0.5,
       "max_spread_pips": 3,
-      "spread_limits": { "London": 2, "US": 3 },
+      "spread_limits": {
+        "London": 2,
+        "US": 3
+      },
       "max_concurrent_trades": 1
     },
     "GBP_JPY": {
@@ -43,46 +48,51 @@
       "rr_ratio": 2.5,
       "sl_mode": "pct_based",
       "tp_mode": "rr_multiple",
-      "sl_min_usd": 0.10,
-      "sl_max_usd": 0.60,
+      "sl_min_usd": 0.1,
+      "sl_max_usd": 0.6,
       "atr_sl_multiplier": 0.5,
       "max_spread_pips": 20,
-      "spread_limits": { "London": 15, "US": 20 },
+      "spread_limits": {
+        "London": 15,
+        "US": 20
+      },
       "max_concurrent_trades": 1
     },
     "USD_JPY": {
       "enabled": true,
       "pip_size": 0.01,
-      "sl_pct": 0.0020,
-      "tp_pct": 0.0050,
+      "sl_pct": 0.002,
+      "tp_pct": 0.005,
       "rr_ratio": 2.5,
       "sl_mode": "pct_based",
       "tp_mode": "rr_multiple",
       "sl_min_usd": 0.06,
-      "sl_max_usd": 0.40,
+      "sl_max_usd": 0.4,
       "atr_sl_multiplier": 0.5,
       "max_spread_pips": 10,
-      "spread_limits": { "London": 8, "US": 10 },
+      "spread_limits": {
+        "London": 8,
+        "US": 10
+      },
       "max_concurrent_trades": 1
     }
   },
-
-  "_comment_global": "Global defaults — used as fallback when a key is absent from the pair block.",
+  "_comment_global": "Global defaults \u2014 used as fallback when a key is absent from the pair block.",
   "signal_threshold": 4,
   "position_full_usd": 100,
   "position_partial_usd": 66,
   "sl_mode": "pct_based",
   "tp_mode": "rr_multiple",
-  "sl_pct": 0.0020,
-  "tp_pct": 0.0050,
+  "sl_pct": 0.002,
+  "tp_pct": 0.005,
   "rr_ratio": 2.5,
   "pip_size": 0.0001,
   "atr_sl_multiplier": 0.5,
-  "sl_min_usd": 0.0010,
-  "sl_max_usd": 0.0040,
-  "fixed_sl_usd": 0.0020,
+  "sl_min_usd": 0.001,
+  "sl_max_usd": 0.004,
+  "fixed_sl_usd": 0.002,
   "fixed_tp_usd": null,
-  "breakeven_trigger_usd": 0.0020,
+  "breakeven_trigger_usd": 0.002,
   "breakeven_enabled": false,
   "margin_safety_factor": 0.6,
   "margin_retry_safety_factor": 0.4,
@@ -98,9 +108,15 @@
   "loss_streak_cooldown_min": 30,
   "sl_reentry_gap_min": 10,
   "max_spread_pips": 5,
-  "spread_limits": { "London": 5, "US": 5 },
+  "spread_limits": {
+    "London": 5,
+    "US": 5
+  },
   "session_only": true,
-  "session_thresholds": { "London": 4, "US": 4 },
+  "session_thresholds": {
+    "London": 4,
+    "US": 4
+  },
   "news_filter_enabled": true,
   "news_block_before_min": 30,
   "news_block_after_min": 30,
@@ -124,8 +140,21 @@
   "db_cleanup_hour_sgt": 0,
   "db_cleanup_minute_sgt": 15,
   "db_vacuum_weekly": true,
-  "calendar_refresh_interval_min": 60,
   "calendar_retry_after_min": 15,
   "calendar_prune_days_ahead": 21,
-  "startup_dedup_seconds": 90
+  "startup_dedup_seconds": 90,
+  "calendar_fetch_interval_min": 60,
+  "london_session_start_hour": 16,
+  "london_session_end_hour": 20,
+  "us_session_start_hour": 21,
+  "us_session_end_hour": 23,
+  "us_session_early_end_hour": 3,
+  "dead_zone_start_hour": 1,
+  "dead_zone_end_hour": 15,
+  "daily_report_hour_sgt": 15,
+  "daily_report_minute_sgt": 30,
+  "weekly_report_hour_sgt": 8,
+  "weekly_report_minute_sgt": 15,
+  "monthly_report_hour_sgt": 8,
+  "monthly_report_minute_sgt": 0
 }

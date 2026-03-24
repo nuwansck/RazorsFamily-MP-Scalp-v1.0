@@ -64,7 +64,7 @@ def configure_logging(level: str | None = None) -> None:
     try:
         logs_dir = Path(DATA_DIR) / 'logs'
         logs_dir.mkdir(parents=True, exist_ok=True)
-        file_handler = RotatingFileHandler(logs_dir / 'cpr_gold_bot.log', maxBytes=1_000_000, backupCount=5, encoding='utf-8')
+        file_handler = RotatingFileHandler(logs_dir / 'rf_scalp_bot.log', maxBytes=1_000_000, backupCount=5, encoding='utf-8')
         file_handler.setFormatter(fmt)
         file_handler.addFilter(redaction)
         root.addHandler(file_handler)

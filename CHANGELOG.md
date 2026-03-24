@@ -2,7 +2,110 @@
 
 ---
 
-## v1.3.0 — 2026-03-23
+## v1.1.0 — 2026-03-24
+
+### 🔴 Fix — Calendar Refresh Interval Setting Was Silently Ignored (`settings.json`, `calendar_fetcher.py`)
+
+**Problem:** `settings.json` defined `"calendar_refresh_interval_min"` but
+`calendar_fetcher.py` read `"calendar_fetch_interval_min"` — a key name mismatch
+that meant the configured interval was never picked up. The code always fell back
+to the hardcoded default of 60 minutes regardless of what was set.
+
+**Fix:** The key in `settings.json` (and `settings.json.example`) has been renamed
+to `"calendar_fetch_interval_min"` to match what the code reads. The default in
+`config_loader.py` is unchanged (60 min).
+
+---
+
+### 🔴 Fix — Trade History Pruning Ignored `db_retention_days` Setting (`bot.py`)
+
+**Problem:** `prune_old_trades()` used a module-level constant `HISTORY_DAYS = 90`
+that was never read from settings. Changing `db_retention_days` in `settings.json`
+correctly drove the database cleanup job, but the JSON trade history was always
+pruned at 90 days regardless.
+
+**Fix:** `HISTORY_DAYS` constant removed. `prune_old_trades()` now accepts a
+`settings` dict and reads `db_retention_days` from it at call time. The `_guard_phase`
+call site passes `settings` through.
+
+---
+
+### 🟡 Clean-up — `atomic_json_write()` Alias Removed (`bot.py`)
+
+`atomic_json_write()` was a single-line wrapper around `save_json()` that added no
+logic and was used inconsistently alongside direct `save_json()` calls in the same
+file. Both call sites (`save_signal_cache`, `save_ops_state`) now call `save_json()`
+directly. The alias function has been removed.
+
+---
+
+### 🟡 Clean-up — Signal Check Display Label Aligned to `signal_threshold` (`bot.py`)
+
+`_build_signal_checks()` displayed `"Score >= 3"` on Telegram signal cards, but
+the actual entry threshold is `signal_threshold` from settings (default 4). The
+label now reads `"Score >= {signal_threshold}"` and reflects whatever is configured.
+
+---
+
+### 🟡 Clean-up — XAU/Gold Dead Code Removed (`oanda_trader.py`)
+
+Gold (XAU_USD) was removed from the bot in v1.0. Five `XAU_USD` conditional
+branches remained in `get_instrument_specs()` — including a read of the nonexistent
+`xau_margin_rate_override` key. All gold-specific code has been removed. The unused
+`load_settings` import in `oanda_trader.py` has also been dropped.
+
+---
+
+### 🟡 Clean-up — Log File Renamed (`logging_utils.py`)
+
+The rotating log file was still named `cpr_gold_bot.log` — the last trace of the
+original CPR Gold Bot product name anywhere in the active codebase. Renamed to
+`rf_scalp_bot.log`.
+
+---
+
+### 🟢 Enhancement — Session Window Hours Parameterised (`bot.py`, `signals.py`, `settings.json`)
+
+Trading session windows (London 16:00–20:59 SGT, US 21:00–23:59 + 00:00–03:59 SGT)
+and the dead-zone range were previously hard-coded in `SESSIONS` (bot.py) and
+`ORB_SESSIONS` (signals.py). They are now fully configurable via `settings.json`:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `london_session_start_hour` | `16` | London window open (SGT hour) |
+| `london_session_end_hour` | `20` | London window close (SGT hour) |
+| `us_session_start_hour` | `21` | US late window open (SGT hour) |
+| `us_session_end_hour` | `23` | US late window close (SGT hour) |
+| `us_session_early_end_hour` | `3` | US early-morning window close (SGT hour) |
+| `dead_zone_start_hour` | `1` | Dead zone start — trade management only (SGT hour) |
+| `dead_zone_end_hour` | `15` | Dead zone end (SGT hour) |
+
+The Monday pre-open guard now reads `trading_day_start_hour_sgt` (already in settings)
+instead of a literal `8`. The `_DEFAULT_ORB_HOURS` fallback in `signals.py` preserves
+v1.0 behaviour when no settings dict is passed (unit tests).
+
+---
+
+### 🟢 Enhancement — Report Schedule Times Parameterised (`scheduler.py`, `settings.json`)
+
+Telegram performance report times were hard-coded in `scheduler.py`. They are now
+fully configurable via `settings.json`:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `daily_report_hour_sgt` | `15` | Daily report hour (SGT, Mon–Fri) |
+| `daily_report_minute_sgt` | `30` | Daily report minute |
+| `weekly_report_hour_sgt` | `8` | Weekly report hour (SGT, Monday) |
+| `weekly_report_minute_sgt` | `15` | Weekly report minute |
+| `monthly_report_hour_sgt` | `8` | Monthly report hour (SGT, first Monday) |
+| `monthly_report_minute_sgt` | `0` | Monthly report minute |
+
+All six keys are registered in `config_loader.py` and `validate_settings()` so
+existing deployments auto-populate defaults on first load without any manual edit.
+
+---
+
+
 
 ### 🔴 Fix — Telegram Header Showed Wrong Version (`telegram_alert.py`)
 

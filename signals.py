@@ -49,10 +49,22 @@ SCALP_TP_PCT      = 0.0050
 ORB_FRESH_MINUTES = 60
 ORB_AGING_MINUTES = 120
 
-ORB_SESSIONS = {
+# Default ORB open hours — used as fallbacks when settings are not available (unit tests).
+# Configurable via settings.json: london_session_start_hour, us_session_start_hour.
+_DEFAULT_ORB_HOURS = {
     "London": (16, 0),
     "US":     (21, 0),
 }
+
+def _build_orb_sessions(settings: dict | None = None) -> dict:
+    """Return ORB session open-hour map derived from settings.
+    Falls back to v1.0 defaults if settings are absent.
+    """
+    s = settings or {}
+    return {
+        "London": (int(s.get("london_session_start_hour", 16)), 0),
+        "US":     (int(s.get("us_session_start_hour",     21)), 0),
+    }
 
 
 def score_to_position_usd(score: int, settings: dict | None = None) -> int:
@@ -162,14 +174,17 @@ class SignalEngine:
 
         # -- 4. ORB -----------------------------------------------------------
         now_sgt      = _dt.now(_SGT)
-        session_name = self._get_active_session(now_sgt)
+        orb_sessions = _build_orb_sessions(settings)
+        session_name = self._get_active_session(now_sgt, settings)
         # ORB cache is keyed per-instrument so each pair has its own ORB
-        orb_high, orb_low, orb_formed = self._get_orb(session_name, instrument, now_sgt, _dp)
+        orb_high, orb_low, orb_formed = self._get_orb(
+            session_name, instrument, now_sgt, _dp, orb_sessions,
+            orb_form_min=int((settings or {}).get("orb_formation_minutes", 15)))
 
         _orb_age_min = 0
-        if orb_formed and session_name in ORB_SESSIONS:
+        if orb_formed and session_name in orb_sessions:
             import datetime as _dt_mod
-            oh, om = ORB_SESSIONS[session_name]
+            oh, om = orb_sessions[session_name]
             open_sgt = now_sgt.replace(hour=oh, minute=om, second=0, microsecond=0)
             if now_sgt.hour == 0 and session_name == "US":
                 open_sgt = open_sgt - _dt_mod.timedelta(days=1)
@@ -413,23 +428,31 @@ class SignalEngine:
 
     # -- ORB helper -----------------------------------------------------------
 
-    def _get_active_session(self, now_sgt: _dt):
+    def _get_active_session(self, now_sgt: _dt, settings: dict | None = None):
+        orb_sessions = _build_orb_sessions(settings)
+        lon_h = orb_sessions["London"][0]
+        us_h  = orb_sessions["US"][0]
+        lon_e = int((settings or {}).get("london_session_end_hour", 20))
+        us_e  = int((settings or {}).get("us_session_end_hour",     23))
         h = now_sgt.hour
-        if 16 <= h <= 20:       return "London"
-        if h >= 21 or h == 0:   return "US"
+        if lon_h <= h <= lon_e:  return "London"
+        if h >= us_h or h == 0:  return "US"
         return None
 
-    def _get_orb(self, session_name, instrument: str, now_sgt: _dt, dp: int = 5):
+    def _get_orb(self, session_name, instrument: str, now_sgt: _dt,
+                 dp: int = 5, orb_sessions: dict | None = None,
+                 orb_form_min: int = 15):
         """Return (orb_high, orb_low, formed) for the current session ORB.
 
         Cache key: {instrument}_{session_open_date}_{session_name}
         Each pair maintains its own ORB independently.
         """
-        if session_name not in ORB_SESSIONS:
+        _orb_sess = orb_sessions if orb_sessions is not None else _DEFAULT_ORB_HOURS
+        if session_name not in _orb_sess:
             return None, None, False
 
         import datetime as _dt_mod
-        open_h, open_m = ORB_SESSIONS[session_name]
+        open_h, open_m = _orb_sess[session_name]
         open_sgt = now_sgt.replace(hour=open_h, minute=open_m, second=0, microsecond=0)
 
         if now_sgt.hour == 0 and session_name == "US":
@@ -445,11 +468,10 @@ class SignalEngine:
             return c["high"], c["low"], True
 
         minutes_since_open = (now_sgt - open_sgt).total_seconds() / 60
-        _orb_form_min = int(load_settings().get("orb_formation_minutes", 15))
 
-        if minutes_since_open < _orb_form_min:
+        if minutes_since_open < orb_form_min:
             log.debug("ORB not yet formed | %s %s (%.0f min, need %d)",
-                      instrument, session_name, minutes_since_open, _orb_form_min)
+                      instrument, session_name, minutes_since_open, orb_form_min)
             return None, None, False
 
         open_utc = open_sgt.astimezone(_UTC)

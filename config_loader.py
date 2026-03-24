@@ -154,6 +154,21 @@ def load_settings() -> dict:
     settings.setdefault('startup_dedup_seconds',     90)
     settings.setdefault('atr_period',                14)
     settings.setdefault('m5_candle_count',           40)
+    # v1.1: session window hours — previously hard-coded in bot.py / signals.py
+    settings.setdefault('london_session_start_hour', 16)
+    settings.setdefault('london_session_end_hour',   20)
+    settings.setdefault('us_session_start_hour',     21)
+    settings.setdefault('us_session_end_hour',       23)
+    settings.setdefault('us_session_early_end_hour',  3)
+    settings.setdefault('dead_zone_start_hour',       1)
+    settings.setdefault('dead_zone_end_hour',        15)
+    # v1.1: report schedule times (SGT) — previously hard-coded in scheduler.py
+    settings.setdefault('daily_report_hour_sgt',     15)
+    settings.setdefault('daily_report_minute_sgt',   30)
+    settings.setdefault('weekly_report_hour_sgt',     8)
+    settings.setdefault('weekly_report_minute_sgt',  15)
+    settings.setdefault('monthly_report_hour_sgt',    8)
+    settings.setdefault('monthly_report_minute_sgt',  0)
 
     if set(settings.keys()) != original_keys:
         _write_json(SETTINGS_FILE, settings)

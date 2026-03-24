@@ -132,6 +132,14 @@ def main():
     cleanup_minute = int(settings.get('db_cleanup_minute_sgt', 15))
     retention_days = int(settings.get('db_retention_days', 90))
 
+    # Report schedule — configurable via settings.json
+    daily_report_hour    = int(settings.get('daily_report_hour_sgt',    15))
+    daily_report_minute  = int(settings.get('daily_report_minute_sgt',  30))
+    weekly_report_hour   = int(settings.get('weekly_report_hour_sgt',    8))
+    weekly_report_minute = int(settings.get('weekly_report_minute_sgt', 15))
+    monthly_report_hour  = int(settings.get('monthly_report_hour_sgt',   8))
+    monthly_report_minute= int(settings.get('monthly_report_minute_sgt', 0))
+
     # Singleton alert — constructed once, shared across all cycles.
     # Avoids re-reading secrets + creating new HTTP sessions every 5 minutes.
     _alert = TelegramAlert()
@@ -165,32 +173,35 @@ def main():
     )
 
     # ── Telegram performance reports ───────────────────────────────────────────
-    # Monthly: first Monday of each month at 08:00 SGT
+    # Monthly: first Monday of each month at monthly_report_hour SGT
     # The first-Monday guard is enforced inside send_monthly_report() itself,
     # so this job fires every Monday but only sends on the first Monday.
     scheduler.add_job(
         send_monthly_report,
-        CronTrigger(day_of_week='mon', hour=8, minute=0, timezone=SG_TZ),
+        CronTrigger(day_of_week='mon', hour=monthly_report_hour,
+                    minute=monthly_report_minute, timezone=SG_TZ),
         id='monthly_report',
         name='Monthly performance report (first Monday)',
         max_instances=1,
         coalesce=True,
     )
 
-    # Weekly: every Monday at 08:15 SGT (covers prior Mon–Fri)
+    # Weekly: every Monday at weekly_report_hour SGT (covers prior Mon–Fri)
     scheduler.add_job(
         send_weekly_report,
-        CronTrigger(day_of_week='mon', hour=8, minute=15, timezone=SG_TZ),
+        CronTrigger(day_of_week='mon', hour=weekly_report_hour,
+                    minute=weekly_report_minute, timezone=SG_TZ),
         id='weekly_report',
         name='Weekly performance report',
         max_instances=1,
         coalesce=True,
     )
 
-    # Daily: Mon–Fri at 15:30 SGT (30 min before London open at 16:00) — v2.4
+    # Daily: Mon–Fri at daily_report_hour SGT (30 min before London open by default)
     scheduler.add_job(
         send_daily_report,
-        CronTrigger(day_of_week='mon-fri', hour=15, minute=30, timezone=SG_TZ),
+        CronTrigger(day_of_week='mon-fri', hour=daily_report_hour,
+                    minute=daily_report_minute, timezone=SG_TZ),
         id='daily_report',
         name='Daily performance report',
         max_instances=1,
@@ -220,9 +231,12 @@ def main():
     logger.info('  Trade cycle    — every %s minutes', cycle_minutes)
     logger.info('  DB cleanup     — daily at %02d:%02d Asia/Singapore', cleanup_hour, cleanup_minute)
     logger.info('  DB retention   — rolling %s days', retention_days)
-    logger.info('  Monthly report — first Monday of month at 08:00 SGT')
-    logger.info('  Weekly report  — every Monday at 08:15 SGT')
-    logger.info('  Daily report   — Mon–Fri at 15:30 SGT')
+    logger.info('  Monthly report — first Monday of month at %02d:%02d SGT',
+                monthly_report_hour, monthly_report_minute)
+    logger.info('  Weekly report  — every Monday at %02d:%02d SGT',
+                weekly_report_hour, weekly_report_minute)
+    logger.info('  Daily report   — Mon–Fri at %02d:%02d SGT',
+                daily_report_hour, daily_report_minute)
 
     logger.info('Running startup cycle...')
     try:

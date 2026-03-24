@@ -51,20 +51,30 @@ log = get_logger(__name__)
 
 SGT          = pytz.timezone("Asia/Singapore")
 HISTORY_FILE = TRADE_HISTORY_FILE
-HISTORY_DAYS = 90
 
 _startup_reconcile_done: bool = False
-
-SESSIONS = [
-    ("US Window",     "US",      0,  0, 3),
-    ("London Window", "London", 16, 20, 4),
-    ("US Window",     "US",     21, 23, 4),
-]
 
 SESSION_BANNERS = {
     "London": "🇬🇧 LONDON",
     "US":     "🗽 US",
 }
+
+
+def _build_sessions(settings: dict) -> list:
+    """Build the SESSIONS list from settings, matching the tuple format:
+    (name, macro, start_hour, end_hour, fallback_threshold).
+    Defaults mirror the hard-coded values from v1.0.
+    """
+    lon_s  = int(settings.get("london_session_start_hour",    16))
+    lon_e  = int(settings.get("london_session_end_hour",      20))
+    us_s   = int(settings.get("us_session_start_hour",        21))
+    us_e   = int(settings.get("us_session_end_hour",          23))
+    us_e2  = int(settings.get("us_session_early_end_hour",     3))
+    return [
+        ("US Window",     "US",     0,     us_e2, 3),
+        ("London Window", "London", lon_s, lon_e, 4),
+        ("US Window",     "US",     us_s,  us_e,  4),
+    ]
 
 
 # ── Multi-pair helpers ─────────────────────────────────────────────────────────
@@ -138,9 +148,10 @@ def _clean_reason(text: str) -> str:
 def _build_signal_checks(score, direction, rr_ratio=None, tp_pct=None,
                          spread_pips=None, spread_limit=None, session_ok=True,
                          news_ok=True, open_trade_ok=True, margin_ok=None,
-                         cooldown_ok=True):
+                         cooldown_ok=True, signal_threshold=4):
     mandatory_checks = [
-        ("Score >= 3", score >= 3 and direction != "NONE", f"{score}/6"),
+        (f"Score >= {signal_threshold}",
+         score >= signal_threshold and direction != "NONE", f"{score}/6"),
         ("RR >= 2", None if rr_ratio is None else rr_ratio >= 2.0,
          "n/a" if rr_ratio is None else f"{rr_ratio:.2f}"),
     ]
@@ -220,6 +231,21 @@ def validate_settings(settings: dict) -> dict:
     settings.setdefault("max_losing_trades_day",      8)
     settings.setdefault("max_trades_london",          10)
     settings.setdefault("max_trades_us",              10)
+    # v1.1: session window hours
+    settings.setdefault("london_session_start_hour",  16)
+    settings.setdefault("london_session_end_hour",    20)
+    settings.setdefault("us_session_start_hour",      21)
+    settings.setdefault("us_session_end_hour",        23)
+    settings.setdefault("us_session_early_end_hour",   3)
+    settings.setdefault("dead_zone_start_hour",        1)
+    settings.setdefault("dead_zone_end_hour",         15)
+    # v1.1: report schedule times (SGT)
+    settings.setdefault("daily_report_hour_sgt",      15)
+    settings.setdefault("daily_report_minute_sgt",    30)
+    settings.setdefault("weekly_report_hour_sgt",      8)
+    settings.setdefault("weekly_report_minute_sgt",   15)
+    settings.setdefault("monthly_report_hour_sgt",     8)
+    settings.setdefault("monthly_report_minute_sgt",   0)
 
     if int(settings.get("loss_streak_cooldown_min", 30)) < 0:
         raise ValueError("loss_streak_cooldown_min must be >= 0")
@@ -252,12 +278,9 @@ def save_history(history: list):
     save_json(HISTORY_FILE, history)
 
 
-def atomic_json_write(path: Path, data):
-    save_json(path, data)
-
-
-def prune_old_trades(history: list) -> list:
-    cutoff = datetime.now(SGT) - timedelta(days=HISTORY_DAYS)
+def prune_old_trades(history: list, settings: dict | None = None) -> list:
+    retention_days = int((settings or {}).get("db_retention_days", 90))
+    cutoff = datetime.now(SGT) - timedelta(days=retention_days)
     active, pruned = [], 0
     for trade in history:
         ts = trade.get("timestamp_sgt", "")
@@ -271,23 +294,28 @@ def prune_old_trades(history: list) -> list:
             active.append(trade)
     if pruned:
         log.info("Pruned %d trade(s) older than %d days | Active: %d",
-                 pruned, HISTORY_DAYS, len(active))
+                 pruned, retention_days, len(active))
     return active
 
 
 # ── Session helpers ────────────────────────────────────────────────────────────
 
 def get_session(now: datetime, settings: dict = None):
-    h  = now.hour
-    st = (settings or {}).get("session_thresholds", {})
-    for name, macro, start, end, fallback_thr in SESSIONS:
+    h       = now.hour
+    s       = settings or {}
+    st      = s.get("session_thresholds", {})
+    sessions = _build_sessions(s)
+    for name, macro, start, end, fallback_thr in sessions:
         if start <= h <= end:
             return name, macro, int(st.get(macro, fallback_thr))
     return None, None, None
 
 
-def is_dead_zone_time(now_sgt: datetime) -> bool:
-    return 1 <= now_sgt.hour <= 15
+def is_dead_zone_time(now_sgt: datetime, settings: dict | None = None) -> bool:
+    s   = settings or {}
+    dz_start = int(s.get("dead_zone_start_hour", 1))
+    dz_end   = int(s.get("dead_zone_end_hour",  15))
+    return dz_start <= now_sgt.hour <= dz_end
 
 
 def get_window_key(session_name: str | None) -> str | None:
@@ -586,7 +614,7 @@ def load_signal_cache(instrument: str) -> dict:
 
 
 def save_signal_cache(cache: dict, instrument: str):
-    atomic_json_write(_pair_state_file(SCORE_CACHE_FILE, instrument), cache)
+    save_json(_pair_state_file(SCORE_CACHE_FILE, instrument), cache)
 
 
 def load_ops_state(instrument: str) -> dict:
@@ -598,7 +626,7 @@ def load_ops_state(instrument: str) -> dict:
 
 
 def save_ops_state(state: dict, instrument: str):
-    atomic_json_write(_pair_state_file(OPS_STATE_FILE, instrument), state)
+    save_json(_pair_state_file(OPS_STATE_FILE, instrument), state)
 
 
 def send_once_per_state(alert, cache: dict, key: str, value: str,
@@ -767,7 +795,7 @@ def _guard_phase(db, run_id, settings, alert, history, now_sgt, today, demo,
                         summary={"stage": "enabled_check", "reason": "disabled"})
         return None
 
-    history[:] = prune_old_trades(history)
+    history[:] = prune_old_trades(history, settings)
     save_history(history)
 
     weekday = now_sgt.weekday()
@@ -785,7 +813,7 @@ def _guard_phase(db, run_id, settings, alert, history, now_sgt, today, demo,
         db.finish_cycle(run_id, status="SKIPPED",
                         summary={"stage": "market_guard", "reason": "Sunday"})
         return None
-    if weekday == 0 and now_sgt.hour < 8:
+    if weekday == 0 and now_sgt.hour < int(settings.get("trading_day_start_hour_sgt", 8)):
         log.info("Monday pre-open — skipping.", extra={"run_id": run_id})
         update_runtime_state(last_cycle_finished=now_sgt.strftime("%Y-%m-%d %H:%M:%S"),
                              status="SKIPPED_MARKET_CLOSED")
@@ -837,7 +865,7 @@ def _guard_phase(db, run_id, settings, alert, history, now_sgt, today, demo,
 
     if settings.get("session_only", True):
         if session is None:
-            if is_dead_zone_time(now_sgt):
+            if is_dead_zone_time(now_sgt, settings):
                 log_event("DEAD_ZONE_SKIP",
                           f"[{instrument}] Dead zone — management active.",
                           run_id=run_id)
@@ -1144,6 +1172,7 @@ def _signal_phase(db, run_id, settings, alert, trader, history,
 
     def _send_signal_update(decision, reason, extra_payload=None):
         payload = _signal_payload(score=score, direction=direction,
+                                  signal_threshold=int(settings.get("signal_threshold", 4)),
                                   **(extra_payload or {}))
         msg = msg_signal_update(
             banner=banner, session=session, direction=direction,

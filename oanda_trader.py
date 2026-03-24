@@ -10,7 +10,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from config_loader import load_secrets, load_settings
+from config_loader import load_secrets
 
 log = logging.getLogger(__name__)
 
@@ -112,15 +112,13 @@ class OandaTrader:
         if instrument in self._specs_cache:
             return self._specs_cache[instrument]
 
-        settings = load_settings()
-        configured_xau_margin = float(settings.get("xau_margin_rate_override", 0.20) or 0.20)
         defaults = {
             "name": instrument,
             "tradeUnitsPrecision": 0,
             "minimumTradeSize": 1,
-            "pipLocation": -2 if instrument == "XAU_USD" else -4,
-            "displayPrecision": 2 if instrument == "XAU_USD" else 5,
-            "marginRate": configured_xau_margin if instrument == "XAU_USD" else 0.05,
+            "pipLocation": -4,
+            "displayPrecision": 5,
+            "marginRate": 0.05,
         }
         try:
             r = self._request(
@@ -134,12 +132,7 @@ class OandaTrader:
                 self._specs_cache[instrument] = defaults
                 return defaults
             d = instruments[0]
-            margin_rate = float(d.get("marginRate", defaults.get("marginRate", 0.05)) or defaults.get("marginRate", 0.05))
-            if instrument == "XAU_USD":
-                # Gold margin varies by broker configuration. Use the more conservative
-                # of the live instrument value and the configured floor so we never
-                # underestimate required margin on small accounts.
-                margin_rate = max(margin_rate, configured_xau_margin)
+            margin_rate = float(d.get("marginRate", defaults["marginRate"]) or defaults["marginRate"])
             result = {
                 "name": d.get("name", instrument),
                 "tradeUnitsPrecision": int(d.get("tradeUnitsPrecision", defaults["tradeUnitsPrecision"])),
