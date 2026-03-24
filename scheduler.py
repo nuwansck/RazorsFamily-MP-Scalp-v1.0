@@ -266,8 +266,19 @@ def main():
                 cycle_minutes=int(settings.get('cycle_minutes', 5)),
                 max_trades_london=int(settings.get('max_trades_london', 10)),
                 max_trades_us=int(settings.get('max_trades_us', 10)),
+                max_trades_tokyo=int(settings.get('max_trades_tokyo', 10)),
                 max_losing_day=int(settings.get('max_losing_trades_day', 8)),
                 trading_day_start_hour=int(settings.get('trading_day_start_hour_sgt', 8)),
+                us_early_end=int(settings.get('us_session_early_end_hour', 3)),
+                dead_zone_start=int(settings.get('dead_zone_start_hour', 4)),
+                dead_zone_end=int(settings.get('dead_zone_end_hour', 7)),
+                tokyo_start=int(settings.get('tokyo_session_start_hour', 8)),
+                tokyo_end=int(settings.get('tokyo_session_end_hour', 15)),
+                london_start=int(settings.get('london_session_start_hour', 16)),
+                london_end=int(settings.get('london_session_end_hour', 20)),
+                us_start=int(settings.get('us_session_start_hour', 21)),
+                us_end=int(settings.get('us_session_end_hour', 23)),
+                max_total_open=int(settings.get('max_total_open_trades', 2)),
             ))
             _state["last_startup_ts"] = _now_ts
             save_json(RUNTIME_STATE_FILE, _state)

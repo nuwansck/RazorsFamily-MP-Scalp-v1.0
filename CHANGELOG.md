@@ -2,7 +2,49 @@
 
 ---
 
-## v1.2.0 — 2026-03-24
+## v1.2.1 — 2026-03-24
+
+### 🔴 Fix — Startup Telegram Still Showed Old Session Schedule (`telegram_templates.py`, `scheduler.py`)
+
+**Problem:** The `msg_startup` function had its session schedule hardcoded with the
+v1.1 layout (dead zone 01:00–15:59, no Tokyo). The v1.2.0 trading logic was fully
+correct — sessions, thresholds, and ORBs all worked — but the startup Telegram
+message displayed stale information on every deploy, making it impossible to visually
+confirm the Tokyo session was active.
+
+**Root cause:** `msg_startup()` accepted only `max_trades_london`, `max_trades_us`,
+and `max_losing_day`. It had no parameters for Tokyo hours, dead zone bounds, US
+session bounds, or the global trade cap. The session schedule rows were hardcoded
+strings rather than being built from settings.
+
+**Fix:** `msg_startup()` signature extended with 11 new parameters covering all
+configurable session bounds. The startup Telegram now shows:
+
+```
+Session schedule (SGT)
+  🗽 00:00–03:59  US cont.     cap 10
+  💤 04:00–07:59  Dead zone
+  🗼 08:00–15:59  Tokyo        cap 10
+  🇬🇧 16:00–20:59  London       cap 10
+  🗽 21:00–23:59  US session   cap 10
+
+Window:    16:00 → 03:59 SGT (Tokyo + London + US)
+Global open cap: 2 trades across all pairs
+```
+
+All values are read from `settings.json` at startup — changing session hours or
+caps in settings will automatically update the Telegram message on next deploy.
+
+The `scheduler.py` call site updated to pass all 11 new parameters.
+
+**Also fixed in this patch:**
+- `msg_session_open()`: Tokyo window now shows `🗼` banner instead of `🗽`
+- `msg_session_cap()`: both `session_name` and `next_session` now correctly resolve
+  to `🗼` for Tokyo rather than defaulting to the US `🗽` icon
+
+---
+
+
 
 ### 🟢 Feature — Tokyo/Asian Session Added (`bot.py`, `signals.py`, `settings.json`)
 

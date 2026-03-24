@@ -369,9 +369,13 @@ def msg_session_cap(
     day_limit: int,
     next_session: str,
 ) -> str:
-    icon           = "🇬🇧" if "London" in session_name else "🗽"
+    if "London" in session_name:   icon = "🇬🇧"
+    elif "Tokyo" in session_name:  icon = "🗼"
+    else:                          icon = "🗽"
     remaining_day  = max(0, day_limit - day_losses)
-    next_icon      = "🗽" if "US" in next_session else "🇬🇧"
+    if "London" in next_session:   next_icon = "🇬🇧"
+    elif "Tokyo" in next_session:  next_icon = "🗼"
+    else:                          next_icon = "🗽"
     remaining_line = (
         f"{remaining_day} loss remaining today before full day stop"
         if remaining_day == 1
@@ -396,7 +400,9 @@ def msg_session_open(
     trades_today: int,
     daily_pnl: float,
 ) -> str:
-    icon = "🇬🇧" if "London" in session_name else "🗽"
+    if "London" in session_name:   icon = "🇬🇧"
+    elif "Tokyo" in session_name:  icon = "🗼"
+    else:                          icon = "🗽"
     return (
         f"{icon} {session_name} Open\n{_DIV}\n"
         f"Hours:     {session_hours_sgt} SGT\n"
@@ -507,11 +513,28 @@ def msg_startup(
     balance: float,
     min_score: int,
     cycle_minutes: int = 5,
-    max_trades_london: int = 4,
-    max_trades_us: int = 4,
-    max_losing_day: int = 3,
+    max_trades_london: int = 10,
+    max_trades_us: int = 10,
+    max_trades_tokyo: int = 10,
+    max_losing_day: int = 8,
     trading_day_start_hour: int = 8,
+    # Session window hours (SGT)
+    us_early_end: int = 3,
+    dead_zone_start: int = 4,
+    dead_zone_end: int = 7,
+    tokyo_start: int = 8,
+    tokyo_end: int = 15,
+    london_start: int = 16,
+    london_end: int = 20,
+    us_start: int = 21,
+    us_end: int = 23,
+    # Global cap
+    max_total_open: int = 2,
 ) -> str:
+    window_line = (
+        f"Window:    {london_start:02d}:00 → {us_early_end:02d}:59 SGT "
+        f"(Tokyo + London + US)\n"
+    )
     return (
         f"🚀 Bot Started — {version}\n{_DIV}\n"
         f"Mode:      {mode}\n"
@@ -521,14 +544,16 @@ def msg_startup(
         f"Sizes:     $66 (score 4) | $100 (score 5–6)\n"
         f"{_DIV}\n"
         f"Session schedule (SGT)\n"
-        f"  🗽 00:00–00:59  US cont.     cap {max_trades_us}\n"
-        f"  💤 01:00–15:59  Dead zone\n"
-        f"  🇬🇧 16:00–20:59  London       cap {max_trades_london}\n"
-        f"  🗽 21:00–23:59  US session   cap {max_trades_us}\n"
+        f"  🗽 {0:02d}:00–{us_early_end:02d}:59  US cont.     cap {max_trades_us}\n"
+        f"  💤 {dead_zone_start:02d}:00–{dead_zone_end:02d}:59  Dead zone\n"
+        f"  🗼 {tokyo_start:02d}:00–{tokyo_end:02d}:59  Tokyo        cap {max_trades_tokyo}\n"
+        f"  🇬🇧 {london_start:02d}:00–{london_end:02d}:59  London       cap {max_trades_london}\n"
+        f"  🗽 {us_start:02d}:00–{us_end:02d}:59  US session   cap {max_trades_us}\n"
         f"{_DIV}\n"
-        f"Window:    16:00 → 01:00 SGT (London + US)\n"
+        f"{window_line}"
         f"Day reset: {trading_day_start_hour:02d}:00 SGT\n"
         f"Daily loss cap: {max_losing_day} losing trades\n"
+        f"Global open cap: {max_total_open} trades across all pairs\n"
         f"Cycle: every {cycle_minutes} min ✅"
     )
 
