@@ -430,13 +430,15 @@ class SignalEngine:
 
     def _get_active_session(self, now_sgt: _dt, settings: dict | None = None):
         orb_sessions = _build_orb_sessions(settings)
-        lon_h = orb_sessions["London"][0]
-        us_h  = orb_sessions["US"][0]
-        lon_e = int((settings or {}).get("london_session_end_hour", 20))
-        us_e  = int((settings or {}).get("us_session_end_hour",     23))
+        lon_h  = orb_sessions["London"][0]
+        us_h   = orb_sessions["US"][0]
+        lon_e  = int((settings or {}).get("london_session_end_hour",    20))
+        us_e   = int((settings or {}).get("us_session_end_hour",        23))
+        us_e2  = int((settings or {}).get("us_session_early_end_hour",   3))
         h = now_sgt.hour
-        if lon_h <= h <= lon_e:  return "London"
-        if h >= us_h or h == 0:  return "US"
+        if lon_h <= h <= lon_e:            return "London"
+        if us_h  <= h <= us_e:            return "US"   # late window: 21–23
+        if 0     <= h <= us_e2:           return "US"   # early window: 00–03
         return None
 
     def _get_orb(self, session_name, instrument: str, now_sgt: _dt,

@@ -1,5 +1,5 @@
 {
-  "bot_name": "RF Scalp v1.0 Multipair",
+  "bot_name": "RF Scalp v1.1 Multipair",
   "demo_mode": true,
   "enabled": true,
   "_comment_pairs": "Per-pair settings override any matching global key for that pair's cycle.",

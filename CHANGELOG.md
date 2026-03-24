@@ -2,7 +2,48 @@
 
 ---
 
-## v1.1.0 — 2026-03-24
+## v1.1.1 — 2026-03-24
+
+### 🔴 Fix — `bot_name` Not Updated for v1.1 (`settings.json`)
+
+**Problem:** `version.py` was correctly bumped to `1.1.0` but `bot_name` in
+`settings.json` was left as `"RF Scalp v1.0 Multipair"`. Because `config_loader`
+always overwrites the Railway volume with the bundled `settings.json` on every
+startup, the old name propagated into every log cycle header and every Telegram
+alert, making it impossible to tell at a glance which version was running.
+
+**Fix:** `bot_name` updated to `"RF Scalp v1.1 Multipair"` in both `settings.json`
+and `settings.json.example`.
+
+---
+
+### 🔴 Fix — Dead Variable and Incorrect Session Bounds in `_get_active_session` (`signals.py`)
+
+**Problem:** The v1.1 refactor of `_get_active_session` read `us_session_end_hour`
+from settings into `us_e` but never applied it — the condition remained
+`h >= us_h or h == 0`. Two consequences:
+
+1. The US late-night window was not capped at `us_session_end_hour` (23 by default).
+   Any hour ≥ 21 would match, including hours that should fall outside the window if
+   the end hour is configured lower.
+2. The US early-morning window matched only `h == 0` (midnight), ignoring
+   `us_session_early_end_hour` (default 3). Hours 01:00–03:00 were silently excluded
+   from ORB session detection in `signals.py`, while `_build_sessions` in `bot.py`
+   correctly included them.
+
+**Fix:** `_get_active_session` now uses explicit bounded ranges for both US windows:
+
+```python
+if us_h  <= h <= us_e:   return "US"   # late window:  21–23
+if 0     <= h <= us_e2:  return "US"   # early window: 00–03
+```
+
+All three configurable hours (`us_session_end_hour`, `us_session_early_end_hour`)
+are now active. Default values preserve v1.0 behaviour exactly.
+
+---
+
+
 
 ### 🔴 Fix — Calendar Refresh Interval Setting Was Silently Ignored (`settings.json`, `calendar_fetcher.py`)
 
