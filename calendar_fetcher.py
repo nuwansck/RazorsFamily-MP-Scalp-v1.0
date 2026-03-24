@@ -31,23 +31,12 @@ FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 NEXT_WEEK_URL = "https://nfs.faireconomy.media/ff_calendar_nextweek.json"
 # Note: alternate CDN (cdn-nfs.faireconomy.media) does not resolve — removed in v1.2.4
 
-GOLD_KEYWORDS = [
-    "fomc", "fed", "powell", "cpi", "pce",
-    "non-farm", "nfp", "unemployment",
-    "core cpi", "core pce", "rate decision",
-    "interest rate", "monetary policy",
-    "gdp", "retail sales", "durable goods",
-    "ism", "pmi",
-    # v1.2: additional keywords that historically move gold
-    "jolts", "initial jobless", "continuing claims",
-    "treasury", "bond auction", "10-year", "10 year",
-    "consumer confidence", "consumer sentiment",
-    "michigan", "empire state", "philly fed",
-    "trade balance", "current account",
-    "housing starts", "building permits",
-    "factory orders", "industrial production",
-    "inflation", "deflation", "yield",
-]
+
+# v1.0 Multipair: currencies whose high/medium-impact events are
+# captured for the news filter (GBP_USD, EUR_USD, GBP_JPY, USD_JPY).
+# All High-impact events are captured; Medium-impact ones apply a score
+# penalty rather than a hard block (controlled by news_medium_penalty_score).
+FOREX_CURRENCIES = {"USD", "GBP", "EUR", "JPY"}
 
 
 def _now_sgt() -> datetime:
@@ -68,14 +57,18 @@ def _save_runtime_state(state: dict) -> None:
     save_json(RUNTIME_STATE_FILE, state)
 
 
-def _is_gold_relevant(title: str, country: str, impact: str) -> bool:
-    if country.upper() != "USD":
+def _is_forex_relevant(title: str, country: str, impact: str) -> bool:
+    """Return True for any High or Medium-impact event for a traded currency.
+
+    Replaces the old gold-specific keyword filter. For multipair forex trading
+    (GBP_USD, EUR_USD, GBP_JPY, USD_JPY) any significant release for USD, GBP,
+    EUR or JPY can move our pairs, so we capture all of them without keyword
+    matching and let the news_filter module apply hard-block / soft-penalty logic.
+    """
+    if country.upper() not in FOREX_CURRENCIES:
         return False
-    # FF feed returns 'High', 'Medium', 'Low' (capitalised) or legacy '3'/'red'/'medium-high'
-    if impact.lower() not in {"high", "medium", "3", "red", "medium-high"}:
-        return False
-    title_lower = title.lower()
-    return any(kw in title_lower for kw in GOLD_KEYWORDS)
+    # FF feed returns 'High', 'Medium', 'Low' (capitalised) or legacy '3'/'red'
+    return impact.lower() in {"high", "medium", "3", "red", "medium-high"}
 
 
 def _date_fmt(date_str: str) -> str:
@@ -105,7 +98,7 @@ def _parse_ff_event(event: dict) -> dict | None:
     date_str = event.get("date", "")
     time_str = event.get("time", "")
 
-    if not _is_gold_relevant(title, country, impact):
+    if not _is_forex_relevant(title, country, impact):
         return None
 
     dt_sgt = None
@@ -204,10 +197,11 @@ def _fetch_ff_events(url: str, suppress_404: bool = False) -> tuple[list, int | 
             data = r.json()
             events = data if isinstance(data, list) else []
             usd_events = [e for e in events if e.get("country", "").upper() == "USD"]
-            impact_values = sorted({str(e.get("impact", "")) for e in usd_events})
+            relevant_events = [e for e in events if e.get("country", "").upper() in FOREX_CURRENCIES]
+            impact_values = sorted({str(e.get("impact", "")) for e in relevant_events})
             log.info(
-                "FF feed OK: %d total events | %d USD | impact values seen: %s",
-                len(events), len(usd_events), impact_values,
+                "FF feed OK: %d total events | %d USD/GBP/EUR/JPY | impact values seen: %s",
+                len(events), len(relevant_events), impact_values,
             )
             return events, 200
         if r.status_code == 404 and suppress_404:
@@ -318,25 +312,23 @@ def run_fetch() -> bool:
         return False
 
     parsed = [e for e in (_parse_ff_event(ev) for ev in all_raw) if e is not None]
-    log.info("Parsed %d gold-relevant events from %d total", len(parsed), len(all_raw))
+    log.info("Parsed %d forex-relevant events from %d total", len(parsed), len(all_raw))
 
     if not parsed:
-        # Diagnostic: show ALL USD high/medium-impact events in the feed so the
-        # operator can see exactly which titles exist vs which keywords matched.
-        # Impact filter must mirror _is_gold_relevant exactly.
+        # Diagnostic: show ALL relevant-currency high/medium-impact events in the
+        # feed so the operator can see which titles exist vs what was captured.
         _relevant_impacts = {"high", "medium", "3", "red", "medium-high"}
-        usd_high = [
-            f"{e.get('title', '')} [{e.get('impact', '')}]"
+        relevant_high = [
+            f"{e.get('title', '')} [{e.get('country','')} {e.get('impact', '')}]"
             for e in all_raw
-            if e.get("country", "").upper() == "USD"
+            if e.get("country", "").upper() in FOREX_CURRENCIES
             and str(e.get("impact", "")).lower() in _relevant_impacts
         ]
         state["calendar_last_fetch_result"] = "no_relevant_events_kept_existing_cache"
         _save_runtime_state(state)
         log.warning(
-            "calendar_fetcher: 0 events parsed. USD high/medium-impact titles in feed "
-            "(check keywords vs titles): %s",
-            usd_high[:20],
+            "calendar_fetcher: 0 events parsed. USD/GBP/EUR/JPY high/medium-impact titles in feed: %s",
+            relevant_high[:20],
         )
         log.warning("No relevant events found in feed — keeping existing cache.")
         return False

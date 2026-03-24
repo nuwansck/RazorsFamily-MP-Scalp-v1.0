@@ -226,13 +226,13 @@ def main():
 
     logger.info('Running startup cycle...')
     try:
-        from version import __version__, BOT_NAME
+        from version import VERSION, DESCRIPTION
         _trader  = OandaTrader(demo=bool(settings.get('demo_mode', True)))
         _summary = _trader.login_with_summary()
         _balance = _summary["balance"] if _summary else 0.0
         _threshold = int(settings.get('signal_threshold', 4))
         _mode    = 'DEMO' if settings.get('demo_mode', True) else 'LIVE'
-        _version = f"{BOT_NAME} v{__version__}"
+        _version = f"{settings.get('bot_name', 'RF Scalp')} v{VERSION}"
 
         # ── Startup message deduplication ──────────────────────────────────
         # Suppress duplicate startup alerts when Railway restarts the container
