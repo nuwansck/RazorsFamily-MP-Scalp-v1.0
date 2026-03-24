@@ -64,4 +64,17 @@ def run_startup_checks() -> list[str]:
             "the first successful calendar fetch completes. Resolves on the first cycle."
         )
 
+    # v1.2: global concurrent-trade cap sanity
+    max_total = int(settings.get("max_total_open_trades", 2))
+    if max_total < 0:
+        warnings.append("max_total_open_trades must be >= 0 (0 = disabled)")
+
+    # v1.2: Tokyo session hour ordering
+    tok_s = int(settings.get("tokyo_session_start_hour", 8))
+    tok_e = int(settings.get("tokyo_session_end_hour",  15))
+    if tok_s >= tok_e:
+        warnings.append(
+            f"tokyo_session_start_hour ({tok_s}) must be < tokyo_session_end_hour ({tok_e})"
+        )
+
     return warnings

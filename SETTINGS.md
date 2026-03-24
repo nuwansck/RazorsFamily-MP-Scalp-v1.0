@@ -27,7 +27,7 @@ These control how the bot scores each 5-minute candle and decides whether to tra
 | Key | Default | Description |
 |---|---|---|
 | `signal_threshold` | `4` | Minimum score (out of 6) required to place a trade. Raise to 5 for higher-quality signals only. |
-| `session_thresholds` | `{"London": 4, "US": 4}` | Per-session score threshold. Can differ — e.g. `{"London": 5, "US": 4}` to be stricter in London. |
+| `session_thresholds` | `{"London": 4, "US": 4, "Tokyo": 5}` | Per-session score threshold. Tokyo defaults to 5 (stricter) since EUR/USD and GBP/USD are quieter in Asian hours. |
 | `ema_fast_period` | `9` | Fast EMA period. Used for crossover detection. |
 | `ema_slow_period` | `21` | Slow EMA period. EMA fast crossing above/below slow is the primary direction signal. |
 | `m5_candle_count` | `40` | Number of M5 candles fetched from OANDA per cycle. Must be > `ema_slow_period + 3`. |
@@ -105,14 +105,16 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 
 | Key | Default | Description |
 |---|---|---|
-| `max_concurrent_trades` | `1` | Maximum open trades at any time. Bot skips new signals if already in a trade. |
-| `max_trades_day` | `20` | Maximum total trades per trading day (resets at `trading_day_start_hour_sgt`). |
-| `max_losing_trades_day` | `8` | Maximum losing trades per day. Bot stops trading for the day after this many losses. |
-| `max_trades_london` | `10` | Maximum trades in the London session (16:00–20:59 SGT). |
-| `max_trades_us` | `10` | Maximum trades in the US session (21:00–00:59 SGT). |
-| `max_losing_trades_session` | `4` | Maximum losing trades per session window. Resets when session changes. |
+| `max_concurrent_trades` | `1` | Maximum open trades **per pair** at any time. |
+| `max_total_open_trades` | `2` | Maximum open trades **across all pairs combined** (broker-verified). `0` = disabled. With 4 pairs at 1 each, setting this to 2 caps total simultaneous exposure to 2 positions. |
+| `max_trades_day` | `20` | Maximum total trades per trading day per pair (resets at `trading_day_start_hour_sgt`). |
+| `max_losing_trades_day` | `8` | Maximum losing trades per day per pair. Bot stops trading for the day after this many losses. |
+| `max_trades_london` | `10` | Maximum trades in the London session per pair. |
+| `max_trades_us` | `10` | Maximum trades in the US session per pair. |
+| `max_trades_tokyo` | `10` | Maximum trades in the Tokyo/Asian session per pair. |
+| `max_losing_trades_session` | `4` | Maximum losing trades per session window per pair. |
 | `loss_streak_cooldown_min` | `30` | Minutes to pause after 2 consecutive losses. Prevents revenge-trading streaks. |
-| `sl_reentry_gap_min` | `5` | Minutes to wait after a stop-loss before entering a new trade. |
+| `sl_reentry_gap_min` | `5` | Minutes to wait after a stop-loss before entering a new trade on the same pair. |
 
 ---
 
@@ -120,18 +122,31 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 
 | Key | Default | Description |
 |---|---|---|
-| `session_only` | `true` | `true` = only trade during London and US windows. `false` = trade any time (not recommended). |
+| `session_only` | `true` | `true` = only trade during active sessions. `false` = trade any time (not recommended). |
 | `trading_day_start_hour_sgt` | `8` | Hour (SGT) when daily counters reset (trade count, loss count). Also used as the Monday market-open guard. |
 | `friday_cutoff_hour_sgt` | `23` | Stop trading on Friday after this hour SGT. |
-| `friday_cutoff_minute_sgt` | `0` | Minute past the Friday cutoff hour to stop trading. |
+| `friday_cutoff_minute_sgt` | `0` | Minute past the Friday cutoff hour. |
 | `cycle_minutes` | `5` | How often the bot runs its trade evaluation loop. Do not change unless testing. |
+| `tokyo_session_start_hour` | `8` | Tokyo/Asian window open hour (SGT, inclusive). |
+| `tokyo_session_end_hour` | `15` | Tokyo/Asian window close hour (SGT, inclusive). |
 | `london_session_start_hour` | `16` | London window open hour (SGT, inclusive). |
 | `london_session_end_hour` | `20` | London window close hour (SGT, inclusive). |
 | `us_session_start_hour` | `21` | US late window open hour (SGT, inclusive). |
 | `us_session_end_hour` | `23` | US late window close hour (SGT, inclusive). |
 | `us_session_early_end_hour` | `3` | US early-morning window close hour (SGT, inclusive). |
-| `dead_zone_start_hour` | `1` | Dead zone start — trade management only, no new entries (SGT). |
-| `dead_zone_end_hour` | `15` | Dead zone end hour (SGT, inclusive). |
+| `dead_zone_start_hour` | `4` | Dead zone start — no new entries (SGT). Now only 04:00–07:59, the pre-Tokyo gap. |
+| `dead_zone_end_hour` | `7` | Dead zone end hour (SGT, inclusive). |
+
+**Session schedule (SGT):**
+```
+00:00–03:59  US continuation (early)   threshold 3/6
+04:00–07:59  Dead zone                 no trading
+08:00–15:59  Tokyo/Asian window        threshold 5/6
+16:00–20:59  London window             threshold 4/6
+21:00–23:59  US session                threshold 4/6
+```
+
+**Tokyo threshold note:** The default threshold of 5/6 is intentionally higher than London/US. The JPY pairs (USD_JPY, GBP_JPY) are most active in Tokyo hours; EUR/USD and GBP/USD are quieter. Raise to 6/6 to effectively disable Tokyo for specific pairs via per-pair settings, or lower to 4 if you want parity across all sessions.
 
 ---
 

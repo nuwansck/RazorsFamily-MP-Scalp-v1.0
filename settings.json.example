@@ -1,5 +1,5 @@
 {
-  "bot_name": "RF Scalp v1.1 Multipair",
+  "bot_name": "RF Scalp v1.2 Multipair",
   "demo_mode": true,
   "enabled": true,
   "_comment_pairs": "Per-pair settings override any matching global key for that pair's cycle.",
@@ -18,7 +18,8 @@
       "max_spread_pips": 5,
       "spread_limits": {
         "London": 4,
-        "US": 5
+        "US": 5,
+        "Tokyo": 4
       },
       "max_concurrent_trades": 1
     },
@@ -36,7 +37,8 @@
       "max_spread_pips": 3,
       "spread_limits": {
         "London": 2,
-        "US": 3
+        "US": 3,
+        "Tokyo": 2
       },
       "max_concurrent_trades": 1
     },
@@ -54,7 +56,8 @@
       "max_spread_pips": 20,
       "spread_limits": {
         "London": 15,
-        "US": 20
+        "US": 20,
+        "Tokyo": 15
       },
       "max_concurrent_trades": 1
     },
@@ -72,7 +75,8 @@
       "max_spread_pips": 10,
       "spread_limits": {
         "London": 8,
-        "US": 10
+        "US": 10,
+        "Tokyo": 8
       },
       "max_concurrent_trades": 1
     }
@@ -110,12 +114,14 @@
   "max_spread_pips": 5,
   "spread_limits": {
     "London": 5,
-    "US": 5
+    "US": 5,
+    "Tokyo": 5
   },
   "session_only": true,
   "session_thresholds": {
     "London": 4,
-    "US": 4
+    "US": 4,
+    "Tokyo": 5
   },
   "news_filter_enabled": true,
   "news_block_before_min": 30,
@@ -149,12 +155,16 @@
   "us_session_start_hour": 21,
   "us_session_end_hour": 23,
   "us_session_early_end_hour": 3,
-  "dead_zone_start_hour": 1,
-  "dead_zone_end_hour": 15,
+  "dead_zone_start_hour": 4,
+  "dead_zone_end_hour": 7,
   "daily_report_hour_sgt": 15,
   "daily_report_minute_sgt": 30,
   "weekly_report_hour_sgt": 8,
   "weekly_report_minute_sgt": 15,
   "monthly_report_hour_sgt": 8,
-  "monthly_report_minute_sgt": 0
+  "monthly_report_minute_sgt": 0,
+  "tokyo_session_start_hour": 8,
+  "tokyo_session_end_hour": 15,
+  "max_trades_tokyo": 10,
+  "max_total_open_trades": 2
 }

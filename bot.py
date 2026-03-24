@@ -57,21 +57,25 @@ _startup_reconcile_done: bool = False
 SESSION_BANNERS = {
     "London": "🇬🇧 LONDON",
     "US":     "🗽 US",
+    "Tokyo":  "🗼 TOKYO",
 }
 
 
 def _build_sessions(settings: dict) -> list:
     """Build the SESSIONS list from settings, matching the tuple format:
     (name, macro, start_hour, end_hour, fallback_threshold).
-    Defaults mirror the hard-coded values from v1.0.
+    Defaults: early-US 00–03, Tokyo 08–15, London 16–20, late-US 21–23.
     """
     lon_s  = int(settings.get("london_session_start_hour",    16))
     lon_e  = int(settings.get("london_session_end_hour",      20))
     us_s   = int(settings.get("us_session_start_hour",        21))
     us_e   = int(settings.get("us_session_end_hour",          23))
     us_e2  = int(settings.get("us_session_early_end_hour",     3))
+    tok_s  = int(settings.get("tokyo_session_start_hour",      8))
+    tok_e  = int(settings.get("tokyo_session_end_hour",       15))
     return [
         ("US Window",     "US",     0,     us_e2, 3),
+        ("Tokyo Window",  "Tokyo",  tok_s, tok_e, 5),
         ("London Window", "London", lon_s, lon_e, 4),
         ("US Window",     "US",     us_s,  us_e,  4),
     ]
@@ -246,6 +250,18 @@ def validate_settings(settings: dict) -> dict:
     settings.setdefault("weekly_report_minute_sgt",   15)
     settings.setdefault("monthly_report_hour_sgt",     8)
     settings.setdefault("monthly_report_minute_sgt",   0)
+    # v1.2: Tokyo/Asian session
+    settings.setdefault("tokyo_session_start_hour",    8)
+    settings.setdefault("tokyo_session_end_hour",     15)
+    settings.setdefault("max_trades_tokyo",           10)
+    # v1.2: global concurrent-trade cap (0 = per-pair limits only)
+    settings.setdefault("max_total_open_trades",       2)
+    # v1.2: dead zone is now just the pre-Tokyo gap (04:00–07:59 SGT)
+    settings["dead_zone_start_hour"] = int(settings.get("dead_zone_start_hour", 4))
+    settings["dead_zone_end_hour"]   = int(settings.get("dead_zone_end_hour",   7))
+    # Ensure Tokyo threshold is present in session_thresholds
+    st = settings.setdefault("session_thresholds", {})
+    st.setdefault("Tokyo", 5)
 
     if int(settings.get("loss_streak_cooldown_min", 30)) < 0:
         raise ValueError("loss_streak_cooldown_min must be >= 0")
@@ -321,18 +337,24 @@ def is_dead_zone_time(now_sgt: datetime, settings: dict | None = None) -> bool:
 def get_window_key(session_name: str | None) -> str | None:
     if session_name == "London Window": return "London"
     if session_name == "US Window":     return "US"
+    if session_name == "Tokyo Window":  return "Tokyo"
     return None
 
 
 def get_window_trade_cap(window_key: str | None, settings: dict) -> int | None:
-    if window_key == "London": return int(settings.get("max_trades_london", 4))
-    if window_key == "US":     return int(settings.get("max_trades_us",     4))
+    if window_key == "London": return int(settings.get("max_trades_london", 10))
+    if window_key == "US":     return int(settings.get("max_trades_us",     10))
+    if window_key == "Tokyo":  return int(settings.get("max_trades_tokyo",  10))
     return None
 
 
 def window_trade_count(history: list, today_str: str,
                        window_key: str, instrument: str) -> int:
-    aliases = {"London": {"London", "London Window"}, "US": {"US", "US Window"}}
+    aliases = {
+        "London": {"London", "London Window"},
+        "US":     {"US", "US Window"},
+        "Tokyo":  {"Tokyo", "Tokyo Window"},
+    }
     valid = aliases.get(window_key, {window_key})
     return sum(
         1 for t in history
@@ -345,7 +367,11 @@ def window_trade_count(history: list, today_str: str,
 
 def session_losses(history: list, today_str: str,
                    macro: str, instrument: str) -> int:
-    aliases = {"London": {"London", "London Window"}, "US": {"US", "US Window"}}
+    aliases = {
+        "London": {"London", "London Window"},
+        "US":     {"US", "US Window"},
+        "Tokyo":  {"Tokyo", "Tokyo Window"},
+    }
     valid = aliases.get(macro, {macro})
     losses = 0
     for t in history:
@@ -895,7 +921,17 @@ def _guard_phase(db, run_id, settings, alert, history, now_sgt, today, demo,
 
     if ops.get("last_session") != session:
         if session is not None:
-            _hours_map = {"US Window": "21:00–00:59", "London Window": "16:00–20:59"}
+            _lon_s = int(settings.get("london_session_start_hour", 16))
+            _lon_e = int(settings.get("london_session_end_hour",   20))
+            _us_s  = int(settings.get("us_session_start_hour",     21))
+            _us_e2 = int(settings.get("us_session_early_end_hour",  3))
+            _tok_s = int(settings.get("tokyo_session_start_hour",   8))
+            _tok_e = int(settings.get("tokyo_session_end_hour",    15))
+            _hours_map = {
+                "US Window":     f"{_us_s:02d}:00–{_us_e2:02d}:59",
+                "London Window": f"{_lon_s:02d}:00–{_lon_e:02d}:59",
+                "Tokyo Window":  f"{_tok_s:02d}:00–{_tok_e:02d}:59",
+            }
             _sess_hours = _hours_map.get(session, "")
             if _sess_hours:
                 _dp, _dc, _ = daily_totals(history, today, instrument=instrument)
@@ -1111,6 +1147,23 @@ def _guard_phase(db, run_id, settings, alert, history, now_sgt, today, demo,
         db.finish_cycle(run_id, status="SKIPPED",
                         summary={"stage": "open_trade_guard", "instrument": instrument})
         return None
+
+    # ── Global concurrent-trade cap (across all pairs) ────────────────────────
+    max_total = int(settings.get("max_total_open_trades", 0))
+    if max_total > 0:
+        total_open = len(trader.get_open_trades())   # all instruments, broker truth
+        if total_open >= max_total:
+            send_once_per_state(
+                alert, ops, "global_cap_state",
+                f"global_cap:{total_open}:{max_total}",
+                f"⏸️ [{instrument}] Global trade cap ({total_open}/{max_total} open across all pairs).",
+                instrument)
+            update_runtime_state(last_cycle_finished=now_sgt.strftime("%Y-%m-%d %H:%M:%S"),
+                                 status="SKIPPED_GLOBAL_TRADE_CAP")
+            db.finish_cycle(run_id, status="SKIPPED",
+                            summary={"stage": "global_trade_cap", "instrument": instrument,
+                                     "total_open": total_open, "cap": max_total})
+            return None
 
     return {
         "trader": trader,

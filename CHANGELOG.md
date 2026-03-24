@@ -2,7 +2,80 @@
 
 ---
 
-## v1.1.1 — 2026-03-24
+## v1.2.0 — 2026-03-24
+
+### 🟢 Feature — Tokyo/Asian Session Added (`bot.py`, `signals.py`, `settings.json`)
+
+**Rationale:** With Gold removed and four Forex pairs active, the Asian session is
+genuinely relevant — especially for the two JPY pairs (USD_JPY, GBP_JPY) whose
+daily range is heavily influenced by the Tokyo open. Running only London + US left
+7.5 hours of tradeable market (08:00–15:59 SGT) completely idle.
+
+**What changed:**
+- `"Tokyo Window"` (08:00–15:59 SGT by default) added as a full trading session in
+  `_build_sessions()` and `_get_active_session()`.
+- The dead zone shrinks from **01:00–15:59** to just **04:00–07:59** — the genuine
+  gap between the early US continuation window and the Tokyo open.
+- Tokyo ORB (Opening Range Breakout) now has its own cache key per instrument,
+  keyed to the Tokyo open hour. Each pair maintains a separate ORB independently.
+- `session_thresholds.Tokyo` defaults to **5/6** (vs 4/6 for London/US). This is
+  intentionally stricter: EUR/USD and GBP/USD are less liquid in Asia, so a higher
+  score requirement acts as a natural filter. Lower to 4 in settings if you want
+  parity.
+- `max_trades_tokyo: 10` added (per-pair cap, same as London/US).
+- Tokyo spread limits inherited from London defaults per pair (tighter than US).
+- `SESSION_BANNERS` updated with `"Tokyo": "🗼 TOKYO"` for Telegram alerts.
+
+**New settings keys:**
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `tokyo_session_start_hour` | `8` | Tokyo window open (SGT) |
+| `tokyo_session_end_hour` | `15` | Tokyo window close (SGT, inclusive) |
+| `max_trades_tokyo` | `10` | Per-pair trade cap for Tokyo session |
+| `dead_zone_start_hour` | `4` | Updated from 1 → 4 (pre-Tokyo gap only) |
+| `dead_zone_end_hour` | `7` | Updated from 15 → 7 |
+| `session_thresholds.Tokyo` | `5` | Added to session_thresholds dict |
+
+All keys auto-populate with safe defaults on first load — no manual edit required
+on existing deployments.
+
+---
+
+### 🟢 Feature — Global Concurrent Trade Cap (`bot.py`, `settings.json`)
+
+**Rationale:** With 4 pairs running independently, the bot could theoretically hold
+4 simultaneous positions (one per pair). That represents $400 of notional risk on a
+$2,000 demo account — 20% exposure at once. A global broker-level cap provides an
+additional safety layer independent of per-pair limits.
+
+**What changed:**
+- New `max_total_open_trades` setting (default **2**). After the per-pair
+  `max_concurrent_trades` check passes, the guard calls `trader.get_open_trades()`
+  — with no instrument filter — to get the true total across all pairs at the broker.
+  If that total is ≥ `max_total_open_trades`, the cycle skips without opening a new
+  position and sends a Telegram alert (deduplicated via `send_once_per_state`).
+- Set to `0` to disable (per-pair limits only).
+- Appears in DB cycle summary as stage `"global_trade_cap"`.
+
+**New settings key:**
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `max_total_open_trades` | `2` | Max simultaneous open trades across all pairs. 0 = disabled. |
+
+---
+
+### 🟡 Clean-up — Dynamic Session Hours in Telegram Session-Open Banner (`bot.py`)
+
+The "session open" Telegram notification previously used a hard-coded `_hours_map`
+string (`"21:00–00:59"` / `"16:00–20:59"`). This is now built dynamically from the
+settings keys so the displayed times always match what the bot actually uses, and
+Tokyo is correctly included.
+
+---
+
+
 
 ### 🔴 Fix — `bot_name` Not Updated for v1.1 (`settings.json`)
 

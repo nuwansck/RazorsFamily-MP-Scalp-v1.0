@@ -160,8 +160,8 @@ def load_settings() -> dict:
     settings.setdefault('us_session_start_hour',     21)
     settings.setdefault('us_session_end_hour',       23)
     settings.setdefault('us_session_early_end_hour',  3)
-    settings.setdefault('dead_zone_start_hour',       1)
-    settings.setdefault('dead_zone_end_hour',        15)
+    settings.setdefault('dead_zone_start_hour',       4)
+    settings.setdefault('dead_zone_end_hour',         7)
     # v1.1: report schedule times (SGT) — previously hard-coded in scheduler.py
     settings.setdefault('daily_report_hour_sgt',     15)
     settings.setdefault('daily_report_minute_sgt',   30)
@@ -169,6 +169,12 @@ def load_settings() -> dict:
     settings.setdefault('weekly_report_minute_sgt',  15)
     settings.setdefault('monthly_report_hour_sgt',    8)
     settings.setdefault('monthly_report_minute_sgt',  0)
+    # v1.2: Tokyo/Asian session
+    settings.setdefault('tokyo_session_start_hour',   8)
+    settings.setdefault('tokyo_session_end_hour',    15)
+    settings.setdefault('max_trades_tokyo',          10)
+    # v1.2: global concurrent-trade cap across all pairs (0 = per-pair limits only)
+    settings.setdefault('max_total_open_trades',      2)
 
     if set(settings.keys()) != original_keys:
         _write_json(SETTINGS_FILE, settings)

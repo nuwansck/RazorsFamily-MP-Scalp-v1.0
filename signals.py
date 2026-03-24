@@ -50,20 +50,23 @@ ORB_FRESH_MINUTES = 60
 ORB_AGING_MINUTES = 120
 
 # Default ORB open hours — used as fallbacks when settings are not available (unit tests).
-# Configurable via settings.json: london_session_start_hour, us_session_start_hour.
+# Configurable via settings.json: london_session_start_hour, us_session_start_hour,
+# tokyo_session_start_hour.
 _DEFAULT_ORB_HOURS = {
     "London": (16, 0),
     "US":     (21, 0),
+    "Tokyo":  ( 8, 0),
 }
 
 def _build_orb_sessions(settings: dict | None = None) -> dict:
     """Return ORB session open-hour map derived from settings.
-    Falls back to v1.0 defaults if settings are absent.
+    Falls back to defaults if settings are absent.
     """
     s = settings or {}
     return {
         "London": (int(s.get("london_session_start_hour", 16)), 0),
         "US":     (int(s.get("us_session_start_hour",     21)), 0),
+        "Tokyo":  (int(s.get("tokyo_session_start_hour",   8)), 0),
     }
 
 
@@ -430,15 +433,19 @@ class SignalEngine:
 
     def _get_active_session(self, now_sgt: _dt, settings: dict | None = None):
         orb_sessions = _build_orb_sessions(settings)
+        s      = settings or {}
         lon_h  = orb_sessions["London"][0]
         us_h   = orb_sessions["US"][0]
-        lon_e  = int((settings or {}).get("london_session_end_hour",    20))
-        us_e   = int((settings or {}).get("us_session_end_hour",        23))
-        us_e2  = int((settings or {}).get("us_session_early_end_hour",   3))
+        tok_h  = orb_sessions["Tokyo"][0]
+        lon_e  = int(s.get("london_session_end_hour",    20))
+        us_e   = int(s.get("us_session_end_hour",        23))
+        us_e2  = int(s.get("us_session_early_end_hour",   3))
+        tok_e  = int(s.get("tokyo_session_end_hour",     15))
         h = now_sgt.hour
-        if lon_h <= h <= lon_e:            return "London"
-        if us_h  <= h <= us_e:            return "US"   # late window: 21–23
-        if 0     <= h <= us_e2:           return "US"   # early window: 00–03
+        if lon_h <= h <= lon_e:   return "London"
+        if us_h  <= h <= us_e:    return "US"    # late window: 21–23
+        if 0     <= h <= us_e2:   return "US"    # early window: 00–03
+        if tok_h <= h <= tok_e:   return "Tokyo"
         return None
 
     def _get_orb(self, session_name, instrument: str, now_sgt: _dt,
