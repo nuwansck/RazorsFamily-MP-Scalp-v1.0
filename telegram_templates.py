@@ -53,34 +53,56 @@ def msg_signal_update(
     execution_checks: list[tuple[str, bool | None, str]] | None = None,
     cycle_minutes: int = 5,
 ) -> str:
-    news_line = f"📰 News penalty active ({news_penalty})\n" if news_penalty else ""
     score_str = f"{score}/6"
     if raw_score is not None and news_penalty:
-        score_str += f"  (raw {raw_score}, news {news_penalty:+d})"
-    details = "\n".join(f"  {r}" for r in detail_lines[:4]) or "  No signal notes"
-    mandatory_text = _render_check_section("Mandatory checks", mandatory_checks)
-    quality_text   = _render_check_section("Quality checks",   quality_checks)
-    execution_text = _render_check_section("Execution checks", execution_checks)
+        score_str += f" (raw {raw_score}, news {news_penalty:+d})"
+
+    # Extract key signal notes — first line is the pair header, rest are signal details
+    notes = [r for r in detail_lines if r.strip()]
+
+    # ── WATCHING — ultra compact, no check tables ──────────────────────────
+    if decision == "WATCHING":
+        news_line = f"⚠️ News penalty: {news_penalty:+d}\n" if news_penalty else ""
+        return (
+            f"{banner}\n"
+            f"📊 {direction}  Score {score_str}  👀 WATCHING\n"
+            f"Reason:  {reason}\n"
+            f"{_DIV}\n"
+            f"{chr(10).join(notes[:4])}\n"
+            f"{news_line}"
+            f"Next cycle in {cycle_minutes} min"
+        )
+
+    # ── BLOCKED — show only the failing reason ─────────────────────────────
+    if decision == "BLOCKED":
+        news_line = f"⚠️ News penalty: {news_penalty:+d}\n" if news_penalty else ""
+        return (
+            f"{banner}\n"
+            f"📊 {direction}  Score {score_str}  ❌ BLOCKED\n"
+            f"Reason:  {reason}\n"
+            f"{news_line}"
+            f"Next cycle in {cycle_minutes} min"
+        )
+
+    # ── READY — show position + execution-critical checks only ─────────────
+    # Pull spread and margin lines from execution_checks
+    spread_line = ""
+    margin_line = ""
+    if execution_checks:
+        for label, ok, detail in execution_checks:
+            if "Spread" in label:
+                spread_line = f"Spread:    {detail}\n"
+            elif "Margin" in label:
+                margin_line = f"Margin:    {detail}\n"
+    news_line = f"⚠️ News penalty: {news_penalty:+d}\n" if news_penalty else ""
     return (
-        f"{banner} SESSION\n"
-        f"📊 Scalp Signal Update\n{_DIV}\n"
-        f"Window:    {session}\n"
-        f"Bias:      {direction}\n"
-        f"Score:     {score_str}\n"
-        f"Position:  {_position_label(position_usd)}\n"
-        f"Strategy:  EMA9/21 + ORB | CPR bias: {cpr_width_pct:.2f}%\n"
-        f"Decision:  {decision}\n"
-        f"Reason:    {reason}\n"
+        f"{banner}\n"
+        f"📊 {direction}  Score {score_str}  ✅ READY\n"
+        f"Position:  {_position_label(position_usd)}  | CPR width: {cpr_width_pct:.2f}%\n"
+        f"{spread_line}"
+        f"{margin_line}"
         f"{_DIV}\n"
-        f"{mandatory_text}"
-        f"{_DIV}\n"
-        f"{quality_text}"
-        f"{_DIV}\n"
-        f"{execution_text}"
-        f"{_DIV}\n"
-        f"Signal notes\n"
-        f"{details}\n"
-        f"{_DIV}\n"
+        f"{chr(10).join(notes[:4])}\n"
         f"{news_line}"
         f"Next cycle in {cycle_minutes} min"
     )

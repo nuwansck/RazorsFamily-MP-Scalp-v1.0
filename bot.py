@@ -861,7 +861,7 @@ def _guard_phase(db, run_id, settings, alert, history, now_sgt, today, demo,
         threshold = int(settings.get("signal_threshold", 4))
 
     threshold = threshold or int(settings.get("signal_threshold", 4))
-    banner    = SESSION_BANNERS.get(macro, "📊") + f" [{instrument}]"
+    banner    = SESSION_BANNERS.get(macro, "📊") + f" [{instrument.replace('_', '/')}]"
     log.info("[%s] Session: %s (%s)", instrument, session, macro,
              extra={"run_id": run_id})
 
