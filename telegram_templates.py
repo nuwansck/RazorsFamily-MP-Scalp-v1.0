@@ -52,6 +52,10 @@ def msg_signal_update(
     quality_checks: list[tuple[str, bool | None, str]] | None = None,
     execution_checks: list[tuple[str, bool | None, str]] | None = None,
     cycle_minutes: int = 5,
+    signal_threshold: int = 4,
+    setup: str = "",
+    orb_age_min: int | None = None,
+    orb_formed: bool = False,
 ) -> str:
     score_str = f"{score}/6"
     if raw_score is not None and news_penalty:
@@ -60,13 +64,28 @@ def msg_signal_update(
     # Extract key signal notes — first line is the pair header, rest are signal details
     notes = [r for r in detail_lines if r.strip()]
 
-    # ── WATCHING — ultra compact, no check tables ──────────────────────────
+    # ── WATCHING — clean info card matching the Image 4 style ─────────────
     if decision == "WATCHING":
         news_line = f"⚠️ News penalty: {news_penalty:+d}\n" if news_penalty else ""
+        # ORB status line
+        orb_line = ""
+        if orb_formed and orb_age_min is not None:
+            if orb_age_min < 60:
+                orb_label = "fresh"
+            elif orb_age_min < 120:
+                orb_label = "aging"
+            else:
+                orb_label = "stale"
+            orb_line = f"ORB:     {orb_age_min}min ({orb_label})\n"
+        setup_line = f"Setup:   {setup}\n" if setup and setup != "No Setup" else ""
         return (
-            f"{banner}\n"
-            f"📊 {direction}  Score {score_str}  👀 WATCHING\n"
-            f"Reason:  {reason}\n"
+            f"{banner} | Watching\n"
+            f"\n"
+            f"Bias:    {direction}\n"
+            f"Score:   {score_str}  (threshold {signal_threshold})\n"
+            f"{setup_line}"
+            f"CPR:     {cpr_width_pct:.2f}% width\n"
+            f"{orb_line}"
             f"{news_line}"
             f"Next cycle in {cycle_minutes} min"
         )
@@ -134,6 +153,7 @@ def msg_trade_opened(
     margin_mode: str = "NORMAL",
     margin_usage_pct: float | None = None,
     price_dp: int = 5,
+    tp2_rr: float = 3.0,
 ) -> str:
     slip     = fill_price - signal_price
     # Slip threshold = 1 pip (derived from price_dp: dp=5→0.0001, dp=3→0.01)
@@ -146,13 +166,23 @@ def msg_trade_opened(
     if raw_score is not None and news_penalty:
         score_str += f"  (raw {raw_score}, news {news_penalty:+d})"
     mode = "DEMO" if demo else "LIVE"
+
+    # TP2 reference — manual target at tp2_rr × RR (not placed as an order)
+    tp2_move  = round(sl_usd * tp2_rr, price_dp + 2)
+    tp2_price = round(fill_price + tp2_move if direction == "BUY"
+                      else fill_price - tp2_move, price_dp)
+    tp2_line  = (f"TP2:      {tp2_price:.{price_dp}f}  (+{tp2_move:.{price_dp}f} move)"
+                 f"  ← {tp2_rr:.1f}×RR ref\n")
+
     return (
         f"{banner} 🥇 New Trade — {direction}\n{_DIV}\n"
         f"Setup:    {setup}\n"
         f"Window:   {session}\n"
         f"Fill:     {fill_price:.{price_dp}f}{slip_str}\n"
         f"SL:       {sl_price:.{price_dp}f}  (-{sl_usd:.{price_dp}f} move)\n"
-        f"TP:       {tp_price:.{price_dp}f}  (+{tp_usd:.{price_dp}f} move)\n"
+        f"TP1:      {tp_price:.{price_dp}f}  (+{tp_usd:.{price_dp}f} move)"
+        f"  ← bot target\n"
+        f"{tp2_line}"
         f"Units:    {units}\n"
         f"Position: {_position_label(position_usd)}  (1:{rr_ratio:.0f})\n"
         f"EMA:      CPR bias={cpr_width_pct:.2f}% | Spread: {spread_pips} pips\n"
@@ -594,6 +624,10 @@ def msg_daily_report(
     best_line  = f"  Best:     ${best['pnl']:+.2f}  ({best['time']} SGT)\n"  if best  else ""
     worst_line = f"  Worst:    ${worst['pnl']:+.2f}  ({worst['time']} SGT)\n" if worst else ""
 
+    # Instant SL flag — trades that hit SL within one candle (≤5 min)
+    instant_sl = day_stats.get("instant_sl_count", 0)
+    instant_sl_line = f"  ⚡ Instant SL: {instant_sl} trade(s) closed ≤5 min\n" if instant_sl > 0 else ""
+
     # Blocked cycles breakdown
     blocked_parts = []
     if blocked_spread:
@@ -616,6 +650,7 @@ def msg_daily_report(
         f"{r_line}"
         f"{best_line}"
         f"{worst_line}"
+        f"{instant_sl_line}"
         f"{blocked_line}"
         f"{_DIV}\n"
         f"Week-to-date\n"

@@ -85,6 +85,7 @@ def _stats(trades: list) -> dict:
             "win_rate": 0.0, "profit_factor": None,
             "avg_r": None, "max_win_streak": 0, "max_loss_streak": 0,
             "best_trade": None, "worst_trade": None,
+            "instant_sl_count": 0,
         }
 
     wins   = [t for t in trades if t["realized_pnl_usd"] > 0]
@@ -128,6 +129,25 @@ def _stats(trades: list) -> dict:
     best_trade  = _trade_summary(max(trades, key=lambda t: t["realized_pnl_usd"]))
     worst_trade = _trade_summary(min(trades, key=lambda t: t["realized_pnl_usd"]))
 
+    # Instant SL: a losing trade that closed within one candle (≤ cycle_minutes, ~5 min)
+    def _trade_duration_min(t) -> int | None:
+        open_ts  = t.get("timestamp_sgt", "")
+        close_ts = t.get("closed_at_sgt", "")
+        if not open_ts or not close_ts:
+            return None
+        try:
+            from datetime import datetime
+            fmt = "%Y-%m-%d %H:%M:%S"
+            return int((datetime.strptime(close_ts[:19], fmt) -
+                        datetime.strptime(open_ts[:19], fmt)).total_seconds() / 60)
+        except Exception:
+            return None
+
+    instant_sl_count = sum(
+        1 for t in losses
+        if (_trade_duration_min(t) or 999) <= 5
+    )
+
     return {
         "count":          len(trades),
         "wins":           len(wins),
@@ -142,6 +162,7 @@ def _stats(trades: list) -> dict:
         "max_loss_streak":max_loss_s,
         "best_trade":     best_trade,
         "worst_trade":    worst_trade,
+        "instant_sl_count": instant_sl_count,
     }
 
 

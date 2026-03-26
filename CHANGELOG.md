@@ -2,7 +2,99 @@
 
 ---
 
-## v1.2.1 — 2026-03-24
+## v1.3.0 — 2026-03-26
+
+### 🔴 Fix — WATCHING Card Showed Wrong Session Threshold (`bot.py`, `telegram_templates.py`)
+
+**Problem:** The signal WATCHING card displayed `Score: 2/6 (threshold 5)` even
+during London session (which uses threshold 4). The `_send_signal_update` closure
+was defined before `_thr` was computed, so it fell back to reading the global
+`signal_threshold: 4` setting instead of the session-resolved value. During Tokyo
+this happened to show `5` (Tokyo's threshold), but during London it showed `4` only
+by coincidence. Any session with a non-default threshold would display incorrectly.
+
+**Fix:** `_thr` is now computed immediately after `cpr_w` — before the closure is
+defined — and passed explicitly into both `_signal_payload()` and `msg_signal_update()`.
+The WATCHING card will always show the threshold that is actually in effect for the
+current session.
+
+---
+
+### 🟢 Feature — WATCHING Card Redesigned (`telegram_templates.py`)
+
+The WATCHING card has been redesigned to match a cleaner info-card format (matching
+Image 4 from user feedback), replacing the old one-liner format:
+
+**Before:**
+```
+🇬🇧 LONDON [GBP/USD]
+📊 BUY  Score 2/6  👀 WATCHING
+Reason:  R:R 1:2.5
+Next cycle in 5 min
+```
+
+**After:**
+```
+🇬🇧 LONDON [GBP/USD] | Watching
+
+Bias:    BUY
+Score:   2/6  (threshold 4)
+Setup:   EMA Trend Up
+CPR:     0.48% width
+ORB:     89min (aging)
+
+Next cycle in 5 min
+```
+
+Changes:
+- `| Watching` suffix on the banner line instead of an inline icon
+- `Score` shows the actual session threshold in parentheses
+- `Setup` line shows the detected setup name (EMA Fresh Cross Up, EMA Trend Down, etc.)
+- `ORB` status line shows age and freshness label (`fresh` / `aging` / `stale`)
+- News penalty still shown when active
+- Three new params added to `msg_signal_update`: `signal_threshold`, `setup`, `orb_age_min`, `orb_formed`
+
+---
+
+### 🟢 Feature — TP2 Reference Level in Trade Opened Alert (`telegram_templates.py`, `bot.py`, `settings.json`)
+
+The trade opened Telegram alert now shows a TP2 reference level alongside the bot's
+TP1 target. TP2 is a display-only reference — no second order is placed.
+
+**Trade opened alert now shows:**
+```
+SL:   1.33749  (-0.00268 move)
+TP1:  1.34687  (+0.00670 move)  ← bot target
+TP2:  1.35018  (+0.01005 move)  ← 3.0×RR ref
+```
+
+TP2 is calculated as `entry ± (sl_distance × tp2_rr_reference)`. The multiplier
+defaults to `3.0` and is fully configurable:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `tp2_rr_reference` | `3.0` | R:R multiplier for the TP2 reference level displayed in trade alerts. Set to `0` to hide. |
+
+---
+
+### 🟢 Feature — Instant SL Flag in Daily Report (`reporting.py`, `telegram_templates.py`)
+
+The daily performance report now flags trades that hit their stop loss within
+5 minutes of being opened — a signal that the entry caught a bad fill or an
+immediate reversal.
+
+**Daily report now includes (when applicable):**
+```
+  ⚡ Instant SL: 1 trade(s) closed ≤5 min
+```
+
+Detection: any losing trade where `closed_at_sgt - timestamp_sgt ≤ 5 minutes`.
+The count is added to the `day_stats` dict as `instant_sl_count` and displayed
+only when > 0, so clean days are unaffected.
+
+---
+
+
 
 ### 🔴 Fix — Startup Telegram Still Showed Old Session Schedule (`telegram_templates.py`, `scheduler.py`)
 

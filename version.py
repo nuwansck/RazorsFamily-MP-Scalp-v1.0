@@ -1,2 +1,2 @@
-VERSION     = "1.2.1"
-DESCRIPTION = "RF Scalp v1.2 Multipair — Forex scalping: GBP/USD, EUR/USD, GBP/JPY, USD/JPY"
+VERSION     = "1.3.0"
+DESCRIPTION = "RF Scalp v1.3 Multipair — Forex scalping: GBP/USD, EUR/USD, GBP/JPY, USD/JPY"

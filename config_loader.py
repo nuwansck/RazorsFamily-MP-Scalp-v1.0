@@ -175,6 +175,8 @@ def load_settings() -> dict:
     settings.setdefault('max_trades_tokyo',          10)
     # v1.2: global concurrent-trade cap across all pairs (0 = per-pair limits only)
     settings.setdefault('max_total_open_trades',      2)
+    # v1.3: TP2 reference multiplier shown in trade opened Telegram alert
+    settings.setdefault('tp2_rr_reference',           3.0)
 
     if set(settings.keys()) != original_keys:
         _write_json(SETTINGS_FILE, settings)

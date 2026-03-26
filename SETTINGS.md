@@ -208,6 +208,7 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 | `weekly_report_minute_sgt` | `15` | Minute for the weekly report. Default: 08:15 SGT. |
 | `monthly_report_hour_sgt` | `8` | Hour (SGT, first Monday of month) to send the monthly performance report. |
 | `monthly_report_minute_sgt` | `0` | Minute for the monthly report. Default: 08:00 SGT. |
+| `tp2_rr_reference` | `3.0` | R:R multiplier for the TP2 reference level shown in trade opened Telegram alerts. Displayed as a manual take-profit reference — no second order is placed. Set to `0` to hide. |
 
 ---
 

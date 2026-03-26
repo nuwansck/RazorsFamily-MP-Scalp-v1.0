@@ -1,5 +1,5 @@
 {
-  "bot_name": "RF Scalp v1.2 Multipair",
+  "bot_name": "RF Scalp v1.3 Multipair",
   "demo_mode": true,
   "enabled": true,
   "_comment_pairs": "Per-pair settings override any matching global key for that pair's cycle.",
@@ -166,5 +166,6 @@
   "tokyo_session_start_hour": 8,
   "tokyo_session_end_hour": 15,
   "max_trades_tokyo": 10,
-  "max_total_open_trades": 2
+  "max_total_open_trades": 2,
+  "tp2_rr_reference": 3.0
 }

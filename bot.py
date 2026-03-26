@@ -256,6 +256,8 @@ def validate_settings(settings: dict) -> dict:
     settings.setdefault("max_trades_tokyo",           10)
     # v1.2: global concurrent-trade cap (0 = per-pair limits only)
     settings.setdefault("max_total_open_trades",       2)
+    # v1.3: TP2 reference RR multiplier for the trade opened Telegram alert
+    settings.setdefault("tp2_rr_reference",            3.0)
     # v1.2: dead zone is now just the pre-Tokyo gap (04:00–07:59 SGT)
     settings["dead_zone_start_hour"] = int(settings.get("dead_zone_start_hour", 4))
     settings["dead_zone_end_hour"]   = int(settings.get("dead_zone_end_hour",   7))
@@ -1222,10 +1224,13 @@ def _signal_phase(db, run_id, settings, alert, trader, history,
     )
 
     cpr_w = levels.get("cpr_width_pct", 0)
+    # Resolve per-session threshold BEFORE the closure so all _send_signal_update
+    # calls display the correct session threshold (not the global fallback).
+    _thr = int(ctx.get("threshold", settings.get("signal_threshold", 4)))
 
     def _send_signal_update(decision, reason, extra_payload=None):
         payload = _signal_payload(score=score, direction=direction,
-                                  signal_threshold=int(settings.get("signal_threshold", 4)),
+                                  signal_threshold=_thr,
                                   **(extra_payload or {}))
         msg = msg_signal_update(
             banner=banner, session=session, direction=direction,
@@ -1233,6 +1238,10 @@ def _signal_phase(db, run_id, settings, alert, trader, history,
             detail_lines=details.split(" | "), news_penalty=news_penalty,
             raw_score=raw_score, decision=decision, reason=reason,
             cycle_minutes=int(settings.get("cycle_minutes", 5)),
+            signal_threshold=_thr,
+            setup=levels.get("setup", ""),
+            orb_age_min=levels.get("orb_age_min"),
+            orb_formed=levels.get("orb_formed", False),
             **payload,
         )
         if msg != sig_cache.get("last_signal_msg", ""):
@@ -1254,7 +1263,6 @@ def _signal_phase(db, run_id, settings, alert, trader, history,
                                  "instrument": instrument})
         return None
 
-    _thr = int(ctx.get("threshold", settings.get("signal_threshold", 4)))
     if score < _thr:
         _send_signal_update(
             "WATCHING", f"Score {score}/6 below threshold ({_thr})",
@@ -1556,6 +1564,7 @@ def _execution_phase(db, run_id, settings, alert, trader, history,
                  float(margin_info.get("free_margin", 0)) * 100)
                 if float(margin_info.get("free_margin", 0)) > 0 else None),
             price_dp=dp,
+            tp2_rr=float(settings.get("tp2_rr_reference", 3.0)),
         ))
         log.info("[%s] Trade placed: %s", instrument, record,
                  extra={"run_id": run_id})
