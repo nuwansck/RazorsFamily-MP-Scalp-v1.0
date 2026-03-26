@@ -146,7 +146,7 @@ def main():
 
     _start_health_server()
 
-    logger.info('%s — Scheduler starting', settings.get('bot_name', 'RF Scalp Bot'))
+    logger.info('%s — Scheduler starting', settings.get('bot_name', 'RF MP Scalp v1.6'))
     logger.info('DATA_DIR : %s', DATA_DIR)
     logger.info('Python   : %s', sys.version.split()[0])
     for warning in run_startup_checks():
@@ -240,13 +240,12 @@ def main():
 
     logger.info('Running startup cycle...')
     try:
-        from version import VERSION, DESCRIPTION
         _trader  = OandaTrader(demo=bool(settings.get('demo_mode', True)))
         _summary = _trader.login_with_summary()
         _balance = _summary["balance"] if _summary else 0.0
         _threshold = int(settings.get('signal_threshold', 4))
         _mode    = 'DEMO' if settings.get('demo_mode', True) else 'LIVE'
-        _version = f"{settings.get('bot_name', 'RF Scalp')} v{VERSION}"
+        _version = settings.get('bot_name', 'RF MP Scalp v1.6')
 
         # ── Startup message deduplication ──────────────────────────────────
         # Suppress duplicate startup alerts when Railway restarts the container
