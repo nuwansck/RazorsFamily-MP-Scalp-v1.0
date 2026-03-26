@@ -9,7 +9,7 @@
       "pip_size": 0.0001,
       "sl_pct": 0.002,
       "tp_pct": 0.005,
-      "rr_ratio": 2.5,
+      "rr_ratio": 2.0,
       "sl_mode": "pct_based",
       "tp_mode": "rr_multiple",
       "sl_min_usd": 0.001,
