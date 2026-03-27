@@ -72,8 +72,8 @@ def _build_orb_sessions(settings: dict | None = None) -> dict:
 
 def score_to_position_usd(score: int, settings: dict | None = None) -> int:
     """Return the risk-dollar position size for a given score."""
-    full    = int((settings or {}).get("position_full_usd",    100))
-    partial = int((settings or {}).get("position_partial_usd",  66))
+    full    = int((settings or {}).get("position_full_usd",    30))
+    partial = int((settings or {}).get("position_partial_usd", 20))
     for threshold, size in [(4, full), (2, partial)]:
         if score > threshold:
             return size
@@ -316,23 +316,44 @@ class SignalEngine:
 
         # -- 7. Scalp SL/TP ---------------------------------------------------
         # sl_usd_rec / tp_usd_rec are PRICE DISTANCES (not dollar P&L amounts).
-        #   e.g. GBP_USD entry=1.2734, sl_pct=0.0020 → sl_usd_rec=0.002547
-        #   units = position_usd / sl_usd_rec → correct USD risk for USD-quoted pairs.
+        #   e.g. GBP_USD entry=1.2734, sl_pct=0.0020 -> sl_usd_rec=0.002547
+        #   units = position_usd / sl_usd_rec -> correct USD risk for USD-quoted pairs.
         #   For JPY-quoted pairs (GBP_JPY, USD_JPY) sizing is approximate.
+        #
+        # Priority: pair_sl_tp fixed pips (per-pair) -> sl_pct percentage (global fallback)
         entry       = current_close
         sl_pct_used = float((settings or {}).get("sl_pct", SCALP_SL_PCT))
         tp_pct_used = float((settings or {}).get("tp_pct", SCALP_TP_PCT))
-        sl_usd_rec  = round(entry * sl_pct_used, _dp + 2)
 
-        _tp_mode  = str((settings or {}).get("tp_mode", "rr_multiple")).lower()
-        _rr_ratio = float((settings or {}).get("rr_ratio", 2.5))
-        if _tp_mode == "rr_multiple" and _rr_ratio > 0:
-            tp_usd_rec = round(sl_usd_rec * _rr_ratio, _dp + 2)
-            tp_source  = "rr_multiple"
+        _pair_sl_tp = (settings or {}).get("pair_sl_tp", {})
+        _pair_cfg   = _pair_sl_tp.get(instrument, {})
+
+        if _pair_cfg.get("sl_pips") and _pair_cfg.get("tp_pips"):
+            # Fixed pip mode -- pair-specific SL and TP
+            # pip_value_usd: dollar value of 1 pip for 1 standard lot (100k units).
+            # USD pairs (GBP/USD, EUR/USD) = $10.00.  JPY pairs = ~$6.70 (varies with rate).
+            # sl_usd_rec per unit = sl_pips * (pip_value_usd / 100_000)
+            # This gives units = position_usd / sl_usd_rec -> exact USD risk on ALL pairs.
+            _sl_pips_fixed  = int(_pair_cfg["sl_pips"])
+            _tp_pips_fixed  = int(_pair_cfg["tp_pips"])
+            _pip_val_usd    = float(_pair_cfg.get("pip_value_usd", 10.0))
+            _pip_usd_unit   = _pip_val_usd / 100_000   # $ per unit per pip
+            sl_usd_rec  = round(_sl_pips_fixed * _pip_usd_unit, _dp + 2)
+            tp_usd_rec  = round(_tp_pips_fixed * _pip_usd_unit, _dp + 2)
+            sl_source   = "fixed_pips"
+            tp_source   = "fixed_pips"
         else:
-            tp_usd_rec = round(entry * tp_pct_used, _dp + 2)
-            tp_source  = "scalp_pct"
-        sl_source = "scalp_pct"
+            # Percentage fallback -- original behaviour
+            sl_usd_rec  = round(entry * sl_pct_used, _dp + 2)
+            _tp_mode    = str((settings or {}).get("tp_mode", "rr_multiple")).lower()
+            _rr_ratio   = float((settings or {}).get("rr_ratio", 2.5))
+            if _tp_mode == "rr_multiple" and _rr_ratio > 0:
+                tp_usd_rec = round(sl_usd_rec * _rr_ratio, _dp + 2)
+                tp_source  = "rr_multiple"
+            else:
+                tp_usd_rec = round(entry * tp_pct_used, _dp + 2)
+                tp_source  = "scalp_pct"
+            sl_source = "scalp_pct"
 
         rr_ratio = (tp_usd_rec / sl_usd_rec) if sl_usd_rec > 0 else 0
         _min_rr  = float((settings or {}).get("min_rr_ratio", 2.0))
@@ -364,16 +385,20 @@ class SignalEngine:
         levels["quality_checks"]   = {"tp_ok": True}
         levels["signal_blockers"]  = blockers
 
-        _tp_label = (
-            "{:.1f}x RR".format(_rr_ratio) if _tp_mode == "rr_multiple"
-            else "{:.2f}%".format(tp_pct_used * 100)
-        )
+        # Label for log line — works for both fixed_pips and percentage modes
+        if sl_source == "fixed_pips":
+            _tp_label = "{:.1f}x RR".format(rr_ratio)
+        else:
+            _tp_label = (
+                "{:.1f}x RR".format(_rr_ratio) if _tp_mode == "rr_multiple"
+                else "{:.2f}%".format(tp_pct_used * 100)
+            )
         sl_fmt = "{{:.{}f}}".format(_dp + 2)
         reasons.append(
-            ("SL=" + sl_fmt + " ({src} {pct:.2f}%, {pips}pip) | TP=" + sl_fmt +
+            ("SL=" + sl_fmt + " ({src} {pips}pip) | TP=" + sl_fmt +
              " ({tsrc} {tlbl}, {tpips}pip) | R:R 1:{rr:.1f}").format(
                 sl_usd_rec, tp_usd_rec,
-                src=sl_source, pct=sl_pct_used * 100, pips=sl_pips,
+                src=sl_source, pips=sl_pips,
                 tsrc=tp_source, tlbl=_tp_label, tpips=tp_pips, rr=rr_ratio,
             )
         )

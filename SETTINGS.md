@@ -86,8 +86,33 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 | `rr_ratio` | `2.5` | TP = SL × this value when `tp_mode` is `rr_multiple`. At SL=$11.60, TP = $29.00. |
 | `min_rr_ratio` | `2.0` | Minimum acceptable RR before a trade is blocked. If actual RR < this, signal is rejected. |
 | `fixed_tp_usd` | `null` | Fixed TP in USD — only used when `tp_mode` is `fixed_usd`. |
+| `pair_sl_tp` | see below | **Per-pair fixed pip overrides** — takes priority over `sl_pct` / `rr_ratio` when set. Each pair entry has `sl_pips` and `tp_pips`. Remove a pair's entry to revert to percentage mode. Set to `{}` to disable fixed pips for all pairs. See table below. |
 | `breakeven_enabled` | `false` | Move SL to breakeven when trade reaches `breakeven_trigger_usd` profit. Off by default. |
 | `breakeven_trigger_usd` | `5.0` | Profit in USD needed before SL moves to breakeven. Only active if `breakeven_enabled` is `true`. |
+
+### `pair_sl_tp` — Per-Pair Fixed Pip Values (v1.6.1)
+
+```json
+"pair_sl_tp": {
+  "GBP_USD": {"sl_pips": 20, "tp_pips": 50, "pip_value_usd": 10.0},
+  "EUR_USD": {"sl_pips": 15, "tp_pips": 38, "pip_value_usd": 10.0},
+  "GBP_JPY": {"sl_pips": 35, "tp_pips": 88, "pip_value_usd":  6.7},
+  "USD_JPY": {"sl_pips": 20, "tp_pips": 50, "pip_value_usd":  6.7}
+}
+```
+
+> **`pip_value_usd`** = dollar value of 1 pip for 1 standard lot (100,000 units).
+> USD-quoted pairs (GBP/USD, EUR/USD) are always **10.0**. JPY-quoted pairs
+> (GBP/JPY, USD/JPY) are approximately **6.7** at USD/JPY ~150 — update this
+> if USD/JPY moves more than 10 points from current rate.
+> Without this field the bot falls back to `10.0`, which under-sizes JPY pairs.
+
+| Pair | SL | TP | RR | TP% ADR | pip_value_usd | $/pip (full) | SL risk | TP reward |
+|---|---|---|---|---|---|---|---|---|
+| GBP/USD | 20p | 50p | 2.50× | 62% | 10.0 | $1.50 | $30 | $75 |
+| EUR/USD | 15p | 38p | 2.53× | 58% | 10.0 | $2.00 | $30 | $76 |
+| GBP/JPY | 35p | 88p | 2.51× | 68% | 6.7  | $0.86 | $30 | $76 |
+| USD/JPY | 20p | 50p | 2.50× | 67% | 6.7  | $1.50 | $30 | $75 |
 
 ---
 
@@ -95,8 +120,8 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 
 | Key | Default | Description |
 |---|---|---|
-| `position_full_usd` | `100` | Risk amount in USD for high-conviction signals (score 5–6). |
-| `position_partial_usd` | `66` | Risk amount in USD for standard signals (score 4). |
+| `position_full_usd` | `30` | Risk amount in USD for high-conviction signals (score 5–6). At 1.5% risk on a $2,000 account = $30. Bot back-calculates units from SL distance automatically. |
+| `position_partial_usd` | `20` | Risk amount in USD for standard signals (score 4). At 1.0% risk on a $2,000 account = $20. Scale both values proportionally if account grows. |
 | `account_balance_override` | `0` | Override the live balance for sizing calculations. `0` = use real balance from OANDA. |
 
 ---
@@ -105,8 +130,8 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 
 | Key | Default | Description |
 |---|---|---|
-| `max_concurrent_trades` | `1` | Maximum open trades **per pair** at any time. |
-| `max_total_open_trades` | `2` | Maximum open trades **across all pairs combined** (broker-verified). `0` = disabled. With 4 pairs at 1 each, setting this to 2 caps total simultaneous exposure to 2 positions. |
+| `max_concurrent_trades` | `1` | Maximum open trades **per pair** at any time. With 4 pairs this allows up to 4 total, but `max_total_open_trades` acts as the hard ceiling. |
+| `max_total_open_trades` | `2` | Hard cap on open trades **across all pairs combined** (broker-verified on every cycle). `0` = disabled. **Set to 2** to run max 2 simultaneous positions regardless of how many pairs have signals. |
 | `max_trades_day` | `20` | Maximum total trades per trading day per pair (resets at `trading_day_start_hour_sgt`). |
 | `max_losing_trades_day` | `8` | Maximum losing trades per day per pair. Bot stops trading for the day after this many losses. |
 | `max_trades_london` | `10` | Maximum trades in the London session per pair. |
@@ -222,8 +247,14 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 },
 "orb_fresh_minutes": 60,        ← lower = stricter ORB freshness
 "orb_aging_minutes": 120,       ← lower = ORB expires sooner
-"rr_ratio": 2.5,                ← raise for bigger wins, fewer hits
-"sl_pct": 0.0025,               ← 0.25% stop loss
+"pair_sl_tp": {                  ← fixed pip SL/TP per pair (v1.6.1 default)
+  "GBP_USD": {"sl_pips": 20, "tp_pips": 50},
+  "EUR_USD": {"sl_pips": 15, "tp_pips": 38},
+  "GBP_JPY": {"sl_pips": 35, "tp_pips": 88},
+  "USD_JPY": {"sl_pips": 20, "tp_pips": 50}
+},                               ← set to {} to revert to sl_pct mode
+"rr_ratio": 2.5,                ← only used when pair_sl_tp is empty
+"sl_pct": 0.002,                ← only used when pair_sl_tp is empty
 "loss_streak_cooldown_min": 30, ← raise to 45 if streaks persist
 "sl_reentry_gap_min": 5         ← raise to 10 to slow re-entry after SL
 ```

@@ -2,6 +2,120 @@
 
 ---
 
+## v1.7.0 — 2026-03-27
+
+### 🟢 Position Sizing — Professional 1.5% Risk Model (`settings.json`, `bot.py`, `signals.py`)
+
+**Problem with previous sizing:** `position_full_usd: 100` meant the bot risked $100
+per trade — 5% of a $2,000 account. Eight consecutive losses (the daily cap) would
+wipe 40% of the account. That is too aggressive for a demo bot still being validated.
+
+**Fix:** Switched to the professional standard of 1.5% risk per trade for full-size
+signals and 1.0% for partial signals. All three places that hold these defaults are
+updated so the values are fully centralised to `settings.json`.
+
+| Setting | Old | New | Effect on $2,000 account |
+|---|---|---|---|
+| `position_full_usd` | 100 | **30** | ~15,000 units GBP/USD, risk $30/trade (1.5%) |
+| `position_partial_usd` | 66 | **20** | ~10,000 units GBP/USD, risk $20/trade (1.0%) |
+| `max_total_open_trades` | 2 | **2** | Hard cap: 2 trades open across all pairs |
+| `max_concurrent_trades` | 1 | **1** | Per-pair cap: 1 trade per instrument |
+
+**Effective unit sizes at 1.5% risk (pair-specific SL from v1.6.1):**
+
+| Pair | Units | $/pip | SL risk | TP reward | % account |
+|---|---|---|---|---|---|
+| GBP/USD | ~15,000 | $1.50 | $30 (20p) | $75 (50p) | 1.5% |
+| EUR/USD | ~20,000 | $2.00 | $30 (15p) | $76 (38p) | 1.5% |
+| GBP/JPY | ~11,000 | $0.86 | $30 (35p) | $76 (88p) | 1.5% |
+| USD/JPY | ~22,000 | $1.50 | $30 (20p) | $75 (50p) | 1.5% |
+
+**Worst-case daily loss (8 SLs at full size):** $240 = 12% of account.
+Previously this was $400 = 20%.
+
+**EV at various win rates (GBP/USD, SL 20p, TP 50p):**
+
+| Win Rate | EV/trade | Monthly (20 trades) |
+|---|---|---|
+| 30% | +$1.50 | +$30 |
+| 40% | +$12.00 | +$240 |
+| 50% | +$22.50 | +$450 |
+
+**Concurrency — centrally controlled via `settings.json`:**
+- `max_total_open_trades: 2` — broker-verified hard cap across all 4 pairs combined
+- `max_concurrent_trades: 1` — per-pair cap (1 trade per instrument at a time)
+- Both values read exclusively from `settings.json` with no hardcoded overrides
+
+---
+
+### 🔴 Fix — JPY Pair Unit Sizing (`signals.py`, `settings.json`)
+
+**Problem:** GBP/JPY and USD/JPY were being sized using `position_usd / sl_price_distance`
+where `sl_price_distance` is in JPY (e.g. 0.35 for 35 pips at pip_size=0.01), not USD.
+This produced absurdly small positions — GBP/JPY: ~86 units, USD/JPY: ~150 units —
+making those trades meaningless to overall P&L.
+
+**Fix:** Added `pip_value_usd` to each entry in `pair_sl_tp`. This is the dollar value
+of 1 pip for 1 standard lot (100,000 units). The SL distance is now calculated as:
+
+```
+sl_usd_rec = sl_pips * (pip_value_usd / 100_000)
+units      = position_usd / sl_usd_rec
+```
+
+For USD pairs `pip_value_usd = 10.0`, giving `sl_usd_rec = sl_pips * 0.0001` — identical
+to the old `pip_size` calculation. For JPY pairs `pip_value_usd = 6.7` (at ~150 USD/JPY),
+giving correctly sized positions of ~8,500–12,800 units.
+
+**Update `pip_value_usd` for JPY pairs** if USD/JPY moves more than 10 points from 150.
+Formula: `pip_value_usd = 1000 / current_USDJPY_rate`.
+
+---
+
+## v1.6.1 — 2026-03-27
+
+### 🟢 Feature — Per-Pair Fixed SL/TP Pips (`signals.py`, `settings.json`)
+
+**Problem with the old approach:** SL and TP were calculated as a percentage of
+entry price (`sl_pct = 0.20%`). This worked reasonably well but produced TP targets
+of 68–98 pips that required 75–100% of the entire daily range to be travelled in one
+direction — rarely achievable on a single M5 trade.
+
+**Fix:** Added a `pair_sl_tp` block in `settings.json` that sets fixed pip values
+per instrument. When present, these override the percentage calculation entirely.
+The fallback to `sl_pct` / `rr_multiple` remains for any pair not in the dict.
+
+**Why these pip values:**
+- SL sized at 5× the typical M5 candle body for each pair — enough buffer to avoid
+  noise-triggered stops while still being tight enough to define risk cleanly.
+- TP set so the target is 58–68% of the average daily range — realistic for a single
+  London or US session move rather than asking for the whole day.
+
+| Pair | Old SL | Old TP | New SL | New TP | TP % ADR |
+|---|---|---|---|---|---|
+| GBP/USD | ~27p | ~68p | **20p** | **50p** | 62% |
+| EUR/USD | ~23p | ~58p | **15p** | **38p** | 58% |
+| GBP/JPY | ~39p | ~98p | **35p** | **88p** | 68% |
+| USD/JPY | ~30p | ~75p | **20p** | **50p** | 67% |
+
+All pairs maintain 2.5× gross RR and ~28–29% break-even win rate — the edge is
+unchanged. The difference is the TP is now within a realistic single-session move.
+
+**New `settings.json` block:**
+```json
+"pair_sl_tp": {
+  "GBP_USD": {"sl_pips": 20, "tp_pips": 50},
+  "EUR_USD": {"sl_pips": 15, "tp_pips": 38},
+  "GBP_JPY": {"sl_pips": 35, "tp_pips": 88},
+  "USD_JPY": {"sl_pips": 20, "tp_pips": 50}
+}
+```
+
+To revert to percentage mode for any pair, remove its entry from `pair_sl_tp`.
+To disable fixed pips entirely, set `"pair_sl_tp": {}`.
+
+---
+
 ## v1.3.0 — 2026-03-26
 
 ### 🔴 Fix — WATCHING Card Showed Wrong Session Threshold (`bot.py`, `telegram_templates.py`)

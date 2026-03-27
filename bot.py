@@ -193,8 +193,9 @@ def validate_settings(settings: dict) -> dict:
         raise ValueError(f"Missing required settings keys: {missing}")
 
     settings.setdefault("signal_threshold",           4)
-    settings.setdefault("position_full_usd",          100)
-    settings.setdefault("position_partial_usd",       66)
+    # v1.7: 1.5% risk/trade on $2,000 account (full) / 1.0% (partial)
+    settings.setdefault("position_full_usd",          30)
+    settings.setdefault("position_partial_usd",       20)
     settings.setdefault("account_balance_override",   0)
     settings.setdefault("enabled",                    True)
     settings.setdefault("pip_size",                   0.0001)
@@ -258,6 +259,13 @@ def validate_settings(settings: dict) -> dict:
     settings.setdefault("max_total_open_trades",       2)
     # v1.3: TP2 reference RR multiplier for the trade opened Telegram alert
     settings.setdefault("tp2_rr_reference",            3.0)
+    # v1.7: per-pair fixed SL/TP pips + pip_value_usd for accurate unit sizing
+    settings.setdefault("pair_sl_tp", {
+        "GBP_USD": {"sl_pips": 20, "tp_pips": 50, "pip_value_usd": 10.0},
+        "EUR_USD": {"sl_pips": 15, "tp_pips": 38, "pip_value_usd": 10.0},
+        "GBP_JPY": {"sl_pips": 35, "tp_pips": 88, "pip_value_usd":  6.7},
+        "USD_JPY": {"sl_pips": 20, "tp_pips": 50, "pip_value_usd":  6.7},
+    })
     # v1.2: dead zone is now just the pre-Tokyo gap (04:00–07:59 SGT)
     settings["dead_zone_start_hour"] = int(settings.get("dead_zone_start_hour", 4))
     settings["dead_zone_end_hour"]   = int(settings.get("dead_zone_end_hour",   7))

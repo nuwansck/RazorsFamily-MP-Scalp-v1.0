@@ -177,6 +177,15 @@ def load_settings() -> dict:
     settings.setdefault('max_total_open_trades',      2)
     # v1.3: TP2 reference multiplier shown in trade opened Telegram alert
     settings.setdefault('tp2_rr_reference',           3.0)
+    # v1.7: per-pair fixed SL/TP pips + pip_value_usd for accurate unit sizing
+    # pip_value_usd = $ value of 1 pip per standard lot (100k units)
+    # USD pairs = 10.0 always. JPY pairs ~ 6.7 (update if USD/JPY moves >10 pts)
+    settings.setdefault('pair_sl_tp', {
+        'GBP_USD': {'sl_pips': 20, 'tp_pips': 50, 'pip_value_usd': 10.0},
+        'EUR_USD': {'sl_pips': 15, 'tp_pips': 38, 'pip_value_usd': 10.0},
+        'GBP_JPY': {'sl_pips': 35, 'tp_pips': 88, 'pip_value_usd':  6.7},
+        'USD_JPY': {'sl_pips': 20, 'tp_pips': 50, 'pip_value_usd':  6.7},
+    })
 
     if set(settings.keys()) != original_keys:
         _write_json(SETTINGS_FILE, settings)
