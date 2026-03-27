@@ -259,6 +259,8 @@ def validate_settings(settings: dict) -> dict:
     settings.setdefault("max_total_open_trades",       2)
     # v1.3: TP2 reference RR multiplier for the trade opened Telegram alert
     settings.setdefault("tp2_rr_reference",            3.0)
+    # v1.7: minimum units after margin guard — reject micro-orders gracefully
+    settings.setdefault("min_trade_units",           1000)
     # v1.7: per-pair fixed SL/TP pips + pip_value_usd for accurate unit sizing
     settings.setdefault("pair_sl_tp", {
         "GBP_USD": {"sl_pips": 20, "tp_pips": 50, "pip_value_usd": 10.0},
@@ -494,12 +496,25 @@ def active_cooldown_until(now_sgt: datetime, instrument: str = ""):
 # ── Position sizing ───────────────────────────────────────────────────────────
 
 def compute_sl_usd(levels: dict, settings: dict) -> float:
-    """Derive SL price-distance from signal recommendation or settings.
+    """Derive SL price-distance for ORDER PLACEMENT from the levels dict.
 
-    The returned value is a price distance (e.g. 0.00254 for GBP_USD), NOT a
-    dollar P&L amount.  units = position_usd / sl_price_distance gives correct
-    USD risk for USD-quoted pairs; JPY pairs are approximate.
+    Priority:
+      1. levels["sl_price_dist"] — set by fixed_pips mode; correct pip_size
+         distance for ALL pairs including JPY (sl_pips * pip_size).
+      2. levels["sl_usd_rec"]   — set by pct_based mode; price distance for
+         USD-quoted pairs only (sl_pct * entry). Used as fallback.
+      3. settings sl_mode fallback.
     """
+    # Fixed pips mode: use pip_size-based price distance (correct for JPY pairs)
+    price_dist = levels.get("sl_price_dist")
+    if price_dist is not None:
+        try:
+            price_dist = float(price_dist)
+            if price_dist > 0:
+                log.debug("Signal SL (price_dist): %.6f", price_dist)
+                return price_dist
+        except (TypeError, ValueError):
+            pass
     rec = levels.get("sl_usd_rec")
     if rec is not None:
         try:
@@ -532,6 +547,15 @@ def compute_sl_usd(levels: dict, settings: dict) -> float:
 
 
 def compute_tp_usd(levels: dict, sl_usd: float, settings: dict) -> float:
+    # Fixed pips mode: use pip_size-based price distance (correct for JPY pairs)
+    price_dist = levels.get("tp_price_dist")
+    if price_dist is not None:
+        try:
+            price_dist = float(price_dist)
+            if price_dist > 0:
+                return price_dist
+        except (TypeError, ValueError):
+            pass
     rec = levels.get("tp_usd_rec")
     if rec is not None:
         try:
@@ -1361,6 +1385,27 @@ def _signal_phase(db, run_id, settings, alert, trader, history,
                                  "instrument": instrument})
         update_runtime_state(last_cycle_finished=now_sgt.strftime("%Y-%m-%d %H:%M:%S"),
                              status="SKIPPED_MARGIN")
+        return None
+
+    # Reject margin-adjusted micro-positions that are too small to be meaningful
+    _min_units = int(settings.get("min_trade_units", 1000))
+    if units < _min_units:
+        reason = f"Units {units:.0f} < min_trade_units {_min_units} after margin guard"
+        log.warning("[%s] Trade blocked — %s", instrument, reason)
+        _send_signal_update(
+            "BLOCKED", f"Margin reduced units to {units:.0f} (min {_min_units})",
+            {"rr_ratio": rr_ratio, "tp_pct": tp_pct,
+             "session_ok": True, "news_ok": True,
+             "open_trade_ok": True, "margin_ok": False})
+        alert.send(msg_error(
+            f"[{instrument}] Units too small after margin guard",
+            f"adjusted={units:.0f} min={_min_units} free=${margin_available:.2f}"))
+        db.finish_cycle(run_id, status="SKIPPED",
+                        summary={"stage": "margin_cap",
+                                 "reason": "min_units_not_met",
+                                 "instrument": instrument})
+        update_runtime_state(last_cycle_finished=now_sgt.strftime("%Y-%m-%d %H:%M:%S"),
+                             status="SKIPPED_MIN_UNITS")
         return None
 
     # stop_pips / tp_pips must use this pair's pip_size for the OANDA order

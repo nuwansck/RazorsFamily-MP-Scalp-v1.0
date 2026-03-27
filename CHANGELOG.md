@@ -4,6 +4,47 @@
 
 ## v1.7.0 — 2026-03-27
 
+### 🔴 Fix — STOP_LOSS_ON_FILL_LOSS on JPY Pairs (`signals.py`, `bot.py`)
+
+**Root cause:** `sl_usd_rec` was being used for two conflicting purposes:
+1. Unit sizing: `units = position_usd / sl_usd_rec` — correct when sl_usd_rec is $ risk per unit
+2. Price placement: `sl_price = entry - sl_usd_rec` — correct only when sl_usd_rec is a price distance
+
+For USD-quoted pairs (GBP/USD, EUR/USD) these are identical because `pip_size = pip_usd_unit`.
+For JPY pairs they differ completely:
+- `sl_usd_rec` for USD/JPY (fixed_pips mode) = 20 × (6.7/100,000) = **0.00134** ($ per unit)
+- Correct price distance for 20 pips = 20 × 0.01 = **0.200**
+
+`compute_sl_tp_prices` was placing SL at 159.937 − 0.00134 = 159.9357 — essentially AT the
+entry price, causing OANDA to reject with `STOP_LOSS_ON_FILL_LOSS`.
+
+**Fix:** `signals.py` fixed_pips block now stores two separate values:
+- `levels["sl_usd_rec"]` — dollar risk per unit, used for unit sizing (unchanged)
+- `levels["sl_price_dist"]` = sl_pips × pip_size — price distance, used for SL/TP placement
+
+`compute_sl_usd` and `compute_tp_usd` in `bot.py` now check `sl_price_dist` / `tp_price_dist`
+first, falling back to `sl_usd_rec` for pct_based mode (backward compatible).
+
+---
+
+### 🔴 Fix — Margin Guard Reducing to Micro-Units (`bot.py`, `settings.json`)
+
+**Problem:** The margin guard was reducing USD/JPY from 14,925 units to 143 units because
+`apply_margin_guard` uses `entry_price` (159.937) in its denominator — correct for EUR/USD
+but inflates the calculation for USD/JPY. The resulting 143-unit order then failed with
+`STOP_LOSS_ON_FILL_LOSS` (compounded by Bug 1 above).
+
+**Fix:** Added `min_trade_units` setting. If the margin guard reduces units below this
+threshold, the trade is rejected cleanly with a Telegram alert instead of sending a
+near-worthless micro-order to OANDA.
+
+| Key | Default | Description |
+|---|---|---|
+| `min_trade_units` | `1000` | Minimum units after margin adjustment. If guard reduces below this, trade is skipped and logged. |
+
+---
+
+
 ### 🟢 Position Sizing — Professional 1.5% Risk Model (`settings.json`, `bot.py`, `signals.py`)
 
 **Problem with previous sizing:** `position_full_usd: 100` meant the bot risked $100

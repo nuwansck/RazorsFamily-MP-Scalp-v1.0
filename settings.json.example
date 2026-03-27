@@ -189,5 +189,6 @@
       "tp_pips": 50,
       "pip_value_usd": 6.7
     }
-  }
+  },
+  "min_trade_units": 1000
 }

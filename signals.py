@@ -337,9 +337,14 @@ class SignalEngine:
             _sl_pips_fixed  = int(_pair_cfg["sl_pips"])
             _tp_pips_fixed  = int(_pair_cfg["tp_pips"])
             _pip_val_usd    = float(_pair_cfg.get("pip_value_usd", 10.0))
-            _pip_usd_unit   = _pip_val_usd / 100_000   # $ per unit per pip
+            _pip_usd_unit   = _pip_val_usd / 100_000   # $ per unit per pip (for sizing)
+            # sl_usd_rec  = dollar risk per unit — used by calculate_units_from_position
+            # sl_price_dist = price distance in quote currency — used for SL/TP price placement
             sl_usd_rec  = round(_sl_pips_fixed * _pip_usd_unit, _dp + 2)
             tp_usd_rec  = round(_tp_pips_fixed * _pip_usd_unit, _dp + 2)
+            # Price distances use pip_size (correct for all pairs incl JPY)
+            levels["sl_price_dist"] = round(_sl_pips_fixed * _pip_size, _dp + 2)
+            levels["tp_price_dist"] = round(_tp_pips_fixed * _pip_size, _dp + 2)
             sl_source   = "fixed_pips"
             tp_source   = "fixed_pips"
         else:
