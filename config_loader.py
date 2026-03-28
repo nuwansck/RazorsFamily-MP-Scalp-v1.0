@@ -179,6 +179,7 @@ def load_settings() -> dict:
     settings.setdefault('tp2_rr_reference',           3.0)
     # v1.7: minimum units after margin guard — reject micro-orders gracefully
     settings.setdefault('min_trade_units',           1000)
+    settings.setdefault('telegram_min_score_alert',   3)  # suppress WATCHING below this score
     # v1.7: per-pair fixed SL/TP pips + pip_value_usd for accurate unit sizing
     # pip_value_usd = $ value of 1 pip per standard lot (100k units)
     # USD pairs = 10.0 always. JPY pairs ~ 6.7 (update if USD/JPY moves >10 pts)

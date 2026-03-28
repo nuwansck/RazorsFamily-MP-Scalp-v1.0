@@ -2,6 +2,36 @@
 
 ---
 
+## v1.7.1 patch — Telegram Alert Suppression
+
+### 🔇 Feature — Suppress Low-Score WATCHING Alerts (`bot.py`, `settings.json`)
+
+**Problem:** Every 5-minute cycle sends up to 4 Telegram messages (one per pair)
+even when score is 1 or 2/6 — well below any tradeable threshold. With 4 pairs
+and a 5-minute cycle, a quiet session generates 48+ useless notifications per hour.
+
+**Fix:** New setting `telegram_min_score_alert` (default: `3`).
+WATCHING alerts are silently suppressed if `score < telegram_min_score_alert`.
+
+What is suppressed:
+- Score 1/6 WATCHING cards ← always noise, never actionable
+- Score 2/6 WATCHING cards ← never actionable (threshold is 4)
+
+What always fires regardless of score:
+- Score 3/6 WATCHING (one step below threshold — worth knowing)
+- Trade opened / trade closed / TP / SL
+- Order failed / margin protection / position size errors
+- Session cap hit / daily loss cap hit
+- News filter blocks
+- Daily / weekly / monthly reports
+- OANDA login failures
+
+| Key | Default | Effect |
+|---|---|---|
+| `telegram_min_score_alert` | `3` | Suppress WATCHING for score < 3. Set `0` to restore all alerts. |
+
+---
+
 ## v1.7.1 — 2026-03-28
 
 ### 🔴 Fix — EUR/USD SL Widened 15p → 20p (`settings.json`)

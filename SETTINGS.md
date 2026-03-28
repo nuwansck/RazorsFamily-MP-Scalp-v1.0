@@ -214,6 +214,7 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 | `margin_retry_safety_factor` | `0.4` | Reduced safety factor used when retrying after a margin rejection. |
 | `margin_rate_override` | `0.0` | Override broker margin rate for all instruments. `0.0` = use live OANDA rate. |
 | `auto_scale_on_margin_reject` | `true` | Automatically reduce position size and retry if OANDA rejects due to insufficient margin. |
+| `telegram_min_score_alert` | `3` | Suppress WATCHING alerts for signals below this score. Score 1–2 alerts are skipped silently; score 3+ still sends. Set to `0` to send all alerts. Errors, trade opens/closes, and session reports always fire regardless. |
 | `telegram_show_margin` | `true` | Include margin details in Telegram trade alerts. |
 
 ---

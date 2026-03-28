@@ -214,6 +214,8 @@ def validate_settings(settings: dict) -> dict:
     settings.setdefault("margin_rate_override",       0.0)
     settings.setdefault("auto_scale_on_margin_reject",True)
     settings.setdefault("telegram_show_margin",       True)
+    # Suppress WATCHING alerts for signals below this score (0 = send all)
+    settings.setdefault("telegram_min_score_alert",   3)
     settings.setdefault("friday_cutoff_hour_sgt",     23)
     settings.setdefault("friday_cutoff_minute_sgt",   0)
     settings.setdefault("news_lookahead_min",         120)
@@ -1282,10 +1284,12 @@ def _signal_phase(db, run_id, settings, alert, trader, history,
                               "last_signal_msg": msg})
             save_signal_cache(sig_cache, instrument)
 
+    _tg_min_score = int(settings.get("telegram_min_score_alert", 3))
     if direction == "NONE" or position_usd <= 0:
-        _send_signal_update("WATCHING", _clean_reason(details),
-                            {"session_ok": True, "news_ok": True,
-                             "open_trade_ok": True})
+        if score >= _tg_min_score or _tg_min_score == 0:
+            _send_signal_update("WATCHING", _clean_reason(details),
+                                {"session_ok": True, "news_ok": True,
+                                 "open_trade_ok": True})
         update_runtime_state(
             last_cycle_finished=now_sgt.strftime("%Y-%m-%d %H:%M:%S"),
             status="COMPLETED_NO_SIGNAL", score=score, direction=direction)
@@ -1296,9 +1300,10 @@ def _signal_phase(db, run_id, settings, alert, trader, history,
         return None
 
     if score < _thr:
-        _send_signal_update(
-            "WATCHING", f"Score {score}/6 below threshold ({_thr})",
-            {"session_ok": True, "news_ok": True, "open_trade_ok": True})
+        if score >= _tg_min_score or _tg_min_score == 0:
+            _send_signal_update(
+                "WATCHING", f"Score {score}/6 below threshold ({_thr})",
+                {"session_ok": True, "news_ok": True, "open_trade_ok": True})
         update_runtime_state(
             last_cycle_finished=now_sgt.strftime("%Y-%m-%d %H:%M:%S"),
             status="COMPLETED_BELOW_THRESHOLD", score=score, direction=direction)
