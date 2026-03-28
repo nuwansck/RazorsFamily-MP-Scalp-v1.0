@@ -184,7 +184,7 @@ def load_settings() -> dict:
     # USD pairs = 10.0 always. JPY pairs ~ 6.7 (update if USD/JPY moves >10 pts)
     settings.setdefault('pair_sl_tp', {
         'GBP_USD': {'sl_pips': 20, 'tp_pips': 50, 'pip_value_usd': 10.0},
-        'EUR_USD': {'sl_pips': 15, 'tp_pips': 38, 'pip_value_usd': 10.0},
+        'EUR_USD': {'sl_pips': 20, 'tp_pips': 38, 'pip_value_usd': 10.0},  # v1.7.1: SL widened 15→20p
         'GBP_JPY': {'sl_pips': 35, 'tp_pips': 88, 'pip_value_usd':  6.7},
         'USD_JPY': {'sl_pips': 20, 'tp_pips': 50, 'pip_value_usd':  6.7},
     })

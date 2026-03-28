@@ -2,6 +2,42 @@
 
 ---
 
+## v1.7.1 — 2026-03-28
+
+### 🔴 Fix — EUR/USD SL Widened 15p → 20p (`settings.json`)
+
+**Problem:** EUR/USD was being stopped out on M5 noise. All 3 EUR/USD losses hit
+at almost exactly −21 pips — just beyond the 15-pip SL plus spread. The SL was
+sitting inside normal M5 candle noise for this pair.
+
+**Evidence from live trades:**
+- Trade #1:  EUR/USD BUY → −20.9 pips → SL hit
+- Trade #5:  EUR/USD BUY → −20.7 pips → SL hit
+- Trade #10: EUR/USD BUY → −21.1 pips → SL hit
+
+All three losses were caused by normal M5 fluctuation, not genuine direction
+reversals. The 15-pip SL was simply too tight for EUR/USD.
+
+**Fix:** EUR/USD `sl_pips` widened from **15 → 20** to match GBP/USD.
+TP remains at 38 pips. RR adjusts from 2.53× to 1.90×.
+
+| | Before | After |
+|---|---|---|
+| EUR/USD SL | 15p | **20p** |
+| EUR/USD TP | 38p | 38p (unchanged) |
+| EUR/USD RR | 2.53× | 1.90× |
+| BE win rate | 28% | **35%** |
+| Units (full $30) | ~20,000 | **~15,000** |
+| $/pip | $2.00 | **$1.50** |
+| SL risk | $30 | $30 (unchanged) |
+
+Note: widening SL reduces unit count proportionally (position_usd stays $30),
+so risk per trade is identical — only the pip target moves.
+
+All other pairs unchanged. JPY pairs running with correct sizing from v1.7.
+
+---
+
 ## v1.7.0 — 2026-03-27
 
 ### 🔴 Fix — STOP_LOSS_ON_FILL_LOSS on JPY Pairs (`signals.py`, `bot.py`)
