@@ -95,7 +95,7 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 ```json
 "pair_sl_tp": {
   "GBP_USD": {"sl_pips": 20, "tp_pips": 50, "pip_value_usd": 10.0},
-  "EUR_USD": {"sl_pips": 15, "tp_pips": 38, "pip_value_usd": 10.0},
+  "EUR_USD": {"sl_pips": 20, "tp_pips": 38, "pip_value_usd": 10.0},
   "GBP_JPY": {"sl_pips": 35, "tp_pips": 88, "pip_value_usd":  6.7},
   "USD_JPY": {"sl_pips": 20, "tp_pips": 50, "pip_value_usd":  6.7}
 }
@@ -110,7 +110,7 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 | Pair | SL | TP | RR | TP% ADR | pip_value_usd | $/pip (full) | SL risk | TP reward |
 |---|---|---|---|---|---|---|---|---|
 | GBP/USD | 20p | 50p | 2.50× | 62% | 10.0 | $1.50 | $30 | $75 |
-| EUR/USD | 15p | 38p | 2.53× | 58% | 10.0 | $2.00 | $30 | $76 |
+| EUR/USD | 20p | 38p | 1.90× | 58% | 10.0 | $1.50 | $30 | $57 |
 | GBP/JPY | 35p | 88p | 2.51× | 68% | 6.7  | $0.86 | $30 | $76 |
 | USD/JPY | 20p | 50p | 2.50× | 67% | 6.7  | $1.50 | $30 | $75 |
 
@@ -228,7 +228,7 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 | `db_cleanup_hour_sgt` | `0` | Hour (SGT) when the daily database cleanup runs. |
 | `db_cleanup_minute_sgt` | `15` | Minute past the hour when cleanup runs. Default: 00:15 SGT. |
 | `db_vacuum_weekly` | `true` | Run SQLite VACUUM weekly (Sundays) to reclaim disk space. |
-| `daily_report_hour_sgt` | `15` | Hour (SGT, Mon–Fri) to send the daily performance Telegram report. |
+| `daily_report_hour_sgt` | `4` | Hour (SGT, Mon–Fri) to send the daily performance Telegram report. Default 04:00 = dead zone start — full trading day captured. |
 | `daily_report_minute_sgt` | `30` | Minute for the daily report. Default: 15:30 SGT (30 min before London open). |
 | `weekly_report_hour_sgt` | `8` | Hour (SGT, every Monday) to send the weekly performance report. |
 | `weekly_report_minute_sgt` | `15` | Minute for the weekly report. Default: 08:15 SGT. |
@@ -250,7 +250,7 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 "orb_aging_minutes": 120,       ← lower = ORB expires sooner
 "pair_sl_tp": {                  ← fixed pip SL/TP per pair (v1.6.1 default)
   "GBP_USD": {"sl_pips": 20, "tp_pips": 50},
-  "EUR_USD": {"sl_pips": 15, "tp_pips": 38},
+  "EUR_USD": {"sl_pips": 20, "tp_pips": 38},
   "GBP_JPY": {"sl_pips": 35, "tp_pips": 88},
   "USD_JPY": {"sl_pips": 20, "tp_pips": 50}
 },                               ← set to {} to revert to sl_pct mode
