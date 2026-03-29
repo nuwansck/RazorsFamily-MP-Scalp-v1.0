@@ -386,11 +386,11 @@ def msg_startup(
         f"Sizes:     ${position_partial_usd} (score 4)  |  ${position_full_usd} (score 5–6)\n"
         f"{_DIV}\n"
         f"Sessions (SGT)\n"
-        f"  🗽 00:00–{us_early_end:02d}:59  US cont.   cap {max_trades_us}  score≥{us_thr}\n"
         f"  ✈️  {dead_zone_start:02d}:00–{dead_zone_end:02d}:59  Dead zone\n"
         f"  🗼 {tokyo_start:02d}:00–{tokyo_end:02d}:59  Tokyo      cap {max_trades_tokyo}  score≥{tok_thr}\n"
         f"  🇬🇧 {london_start:02d}:00–{london_end:02d}:59  London     cap {max_trades_london}  score≥{lon_thr}\n"
         f"  🗽 {us_start:02d}:00–{us_end:02d}:59  US         cap {max_trades_us}  score≥{us_thr}\n"
+        f"  🗽 00:00–{us_early_end:02d}:59  US cont.   cap {max_trades_us}  score≥{us_thr}\n"
         f"{_DIV}\n"
         f"Day reset: {trading_day_start_hour:02d}:00 SGT  |  Loss cap: {max_losing_day}/day\n"
         f"Global cap: {max_total_open} open trades"
@@ -402,32 +402,55 @@ def msg_startup(
 def msg_daily_report(
     day_label, day_stats, wtd_stats, mtd_stats, open_count, report_time,
     blocked_spread=0, blocked_news=0, blocked_signal=0,
+    session_stats=None,
 ) -> str:
-    icon   = _pnl_icon(day_stats["net_pnl"]) if day_stats["count"] > 0 else "📋"
-    oline  = f"Open now: {open_count} position(s)\n" if open_count > 0 else ""
-    bline  = ""
-    parts  = []
+    # No trades today
+    if day_stats["count"] == 0:
+        oline = f"Open now: {open_count} position(s)\n" if open_count > 0 else ""
+        return (
+            f"📊 Daily Summary — {day_label}\n{_DIV}\n"
+            f"No trades closed today\n"
+            f"{_DIV}\n"
+            f"Month-to-date\n  {_mini_stats(mtd_stats)}\n"
+            f"{_DIV}\n"
+            f"{oline}"
+            f"Report: {report_time}"
+        )
+
+    icon  = _pnl_icon(day_stats["net_pnl"])
+    oline = f"Open now: {open_count} position(s)\n" if open_count > 0 else ""
+    parts = []
     if blocked_spread:  parts.append(f"{blocked_spread} spread")
     if blocked_news:    parts.append(f"{blocked_news} news")
     if blocked_signal:  parts.append(f"{blocked_signal} signal")
-    if parts: bline = f"Blocked:  {', '.join(parts)}\n"
+    bline = f"Blocked:  {', '.join(parts)}\n" if parts else ""
 
-    best   = day_stats.get("best_trade")
-    worst  = day_stats.get("worst_trade")
-    bst    = f"  Best:     ${best['pnl']:+.2f}  ({best['time']} SGT)\n"   if best  else ""
-    wst    = f"  Worst:    ${worst['pnl']:+.2f}  ({worst['time']} SGT)\n" if worst else ""
-    isl    = day_stats.get("instant_sl_count", 0)
-    islline= f"  ⚡ Instant SL: {isl} trade(s) ≤5min\n" if isl > 0 else ""
-    fire   = " 🔥" if day_stats.get("wins", 0) >= 3 else ""
+    best  = day_stats.get("best_trade")
+    worst = day_stats.get("worst_trade")
+    bst   = f"  Best:     ${best['pnl']:+.2f}  ({best['time']} SGT)\n"   if best  else ""
+    wst   = f"  Worst:    ${worst['pnl']:+.2f}  ({worst['time']} SGT)\n" if worst else ""
+    isl   = day_stats.get("instant_sl_count", 0)
+    islline = f"  ⚡ Instant SL: {isl} trade(s) ≤5min\n" if isl > 0 else ""
+    fire  = " 🔥" if day_stats.get("wins", 0) >= 3 else ""
+
+    # Session breakdown (Tokyo / London / US)
+    sess_block = ""
+    if session_stats:
+        sess_block = f"{_DIV}\nSession breakdown\n"
+        for name, s in session_stats.items():
+            pnl_str = f"${s['net_pnl']:+.2f}"
+            result  = "✅" if s["net_pnl"] > 0 else ("❌" if s["net_pnl"] < 0 else "—")
+            sess_block += f"  {name:<14} {s['count']}t  {pnl_str}  {result}\n"
 
     return (
-        f"📊 Daily Summary — {day_label}\n{_DIV}\n"
-        f"Trades:   {day_stats['count']}  ({day_stats['wins']}W{fire} / {day_stats['losses']}L)\n"
-        f"Win rate: {day_stats['win_rate']:.0f}%\n"
-        f"Net P&L:  ${day_stats['net_pnl']:+.2f}  {icon}\n"
-        f"{bst}{wst}{islline}{bline}"
+        f"📊 Daily Summary — {day_label}\n"
+        f"{sess_block}"
         f"{_DIV}\n"
-        f"Week-to-date\n  {_mini_stats(wtd_stats)}\n"
+        f"Day total\n"
+        f"  Trades:   {day_stats['count']}  ({day_stats['wins']}W{fire} / {day_stats['losses']}L)\n"
+        f"  Win rate: {day_stats['win_rate']:.0f}%\n"
+        f"  Net P&L:  ${day_stats['net_pnl']:+.2f}  {icon}\n"
+        f"{bst}{wst}{islline}{bline}"
         f"{_DIV}\n"
         f"Month-to-date\n  {_mini_stats(mtd_stats)}\n"
         f"{_DIV}\n"
@@ -438,7 +461,7 @@ def msg_daily_report(
 
 # ── 16. Weekly report ─────────────────────────────────────────────────────────
 
-def msg_weekly_report(week_label, stats, sessions, setups, report_time) -> str:
+def msg_weekly_report(week_label, stats, sessions, setups, report_time, pairs=None) -> str:
     if stats["count"] == 0:
         return f"📅 Weekly Report — {week_label}\n{_DIV}\nNo closed trades.\nReport: {report_time}"
 
@@ -481,6 +504,7 @@ def msg_weekly_report(week_label, stats, sessions, setups, report_time) -> str:
         f"{rline}Streaks:     {stats['max_win_streak']}W / {stats['max_loss_streak']}L max\n"
         f"{bline}{wline}"
         f"{_DIV}\nBy Session\n{_sec(sessions)}"
+        f"{_DIV}\nBy Pair\n{_sec(pairs) if pairs else ''}"
         f"{_DIV}\nBy Setup\n{_setup_sec(setups)}"
         f"{_DIV}\n{verdict}\nReport: {report_time}"
     )

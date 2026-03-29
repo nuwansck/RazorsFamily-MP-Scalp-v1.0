@@ -276,13 +276,14 @@ def _is_first_monday_of_month(now: datetime) -> bool:
 # ── Report senders ─────────────────────────────────────────────────────────────
 
 def send_daily_report() -> None:
-    """Send daily performance summary at 09:30 SGT Mon–Fri.
+    """Send daily performance summary at 04:00 SGT — dead zone start.
 
-    Covers:
-      - Prior trading day  (yesterday, or Friday if today is Monday)
-      - Week-to-date       (Monday 00:00 → now)
-      - Month-to-date      (1st → now)
-      - Blocked cycles breakdown (spread / news / signal) from the cycle DB
+    Fires after US continuation closes (03:59 SGT), capturing the full
+    London + US trading day. Covers:
+      - Current trading day  (16:00 yesterday → 03:59 today)
+      - Session breakdown    (Tokyo / London / US merged)
+      - Month-to-date        (1st → now)
+      - Blocked cycles breakdown
     """
     try:
         from database import Database  # local import avoids circular at module level
@@ -334,9 +335,31 @@ def send_daily_report() -> None:
         except Exception:
             pass
 
+        # Session breakdown — group by macro_session field (London / US / Tokyo)
+        # US continuation (00:00-03:59) uses macro="US" so merges automatically
+        session_order = [
+            ("🗼 Tokyo",   "Tokyo"),
+            ("🇬🇧 London", "London"),
+            ("🗽 US",      "US"),
+        ]
+        session_stats = {}
+        for label, macro_key in session_order:
+            sess_trades = [t for t in pd_trades
+                           if (t.get("macro_session") or t.get("window") or "") == macro_key]
+            if sess_trades:
+                session_stats[label] = _stats(sess_trades)
+
+        # Today's trading day window for daily report
+        # At 04:00 SGT, "today" covers 16:00 yesterday → 03:59 today
+        today_start = (now - timedelta(hours=12)).replace(
+            hour=16, minute=0, second=0, microsecond=0)
+        today_trades = _trades_in_window(filled, today_start, now)
+        today_stats  = _stats(today_trades)
+        today_label  = today_start.strftime("%a %d %b %Y")
+
         msg = msg_daily_report(
-            day_label       = pd_label,
-            day_stats       = pd_stats,
+            day_label       = today_label,
+            day_stats       = today_stats,
             wtd_stats       = wtd_stats,
             mtd_stats       = mtd_stats,
             open_count      = open_count,
@@ -344,6 +367,7 @@ def send_daily_report() -> None:
             blocked_spread  = blocked_spread,
             blocked_news    = blocked_news,
             blocked_signal  = blocked_signal,
+            session_stats   = session_stats,
         )
         ok = TelegramAlert().send(msg)
         if ok:
@@ -369,11 +393,21 @@ def send_weekly_report() -> None:
         sessions                   = _session_breakdown(pw_trades)
         setups                     = _setup_breakdown(pw_trades)
 
+        # By Pair breakdown
+        pw_pairs: dict = {}
+        for t in pw_trades:
+            instr = (t.get("instrument") or "").replace("_", "/")
+            if instr not in pw_pairs:
+                pw_pairs[instr] = []
+            pw_pairs[instr].append(t)
+        pair_stats = {k: _stats(v) for k, v in pw_pairs.items()}
+
         msg = msg_weekly_report(
             week_label = pw_label,
             stats      = pw_stats,
             sessions   = sessions,
             setups     = setups,
+            pairs      = pair_stats,
             report_time= now.strftime("%H:%M SGT"),
         )
         ok = TelegramAlert().send(msg)

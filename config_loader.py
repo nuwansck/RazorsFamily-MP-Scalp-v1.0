@@ -162,9 +162,9 @@ def load_settings() -> dict:
     settings.setdefault('us_session_early_end_hour',  3)
     settings.setdefault('dead_zone_start_hour',       4)
     settings.setdefault('dead_zone_end_hour',         7)
-    # v1.1: report schedule times (SGT) — previously hard-coded in scheduler.py
-    settings.setdefault('daily_report_hour_sgt',     15)
-    settings.setdefault('daily_report_minute_sgt',   30)
+    # v1.8.1: EOD report moves to 04:00 SGT (dead zone start — full day captured)
+    settings.setdefault('daily_report_hour_sgt',      4)
+    settings.setdefault('daily_report_minute_sgt',    0)
     settings.setdefault('weekly_report_hour_sgt',     8)
     settings.setdefault('weekly_report_minute_sgt',  15)
     settings.setdefault('monthly_report_hour_sgt',    8)

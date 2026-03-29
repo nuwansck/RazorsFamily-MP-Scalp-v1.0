@@ -883,6 +883,25 @@ def _guard_phase(db, run_id, settings, alert, history, now_sgt, today, demo,
                         summary={"stage": "market_guard", "reason": "Monday pre-open"})
         return None
 
+    # ── Dead zone early exit — skip ALL API calls if no open trades ────────
+    # 04:00-07:59 SGT: no new entries allowed. If no open trades to manage,
+    # skip before any OANDA call. If trades are open, fall through for
+    # reconcile + PnL management.
+    if is_dead_zone_time(now_sgt, settings):
+        _open_in_history = [t for t in history
+                            if not t.get("realized_pnl_usd") and t.get("status") != "FAILED"]
+        if not _open_in_history:
+            log.debug("[%s] Dead zone + no open trades — skipping cycle.",
+                      instrument, extra={"run_id": run_id})
+            update_runtime_state(last_cycle_finished=now_sgt.strftime("%Y-%m-%d %H:%M:%S"),
+                                 status="SKIPPED_DEAD_ZONE")
+            db.finish_cycle(run_id, status="SKIPPED",
+                            summary={"stage": "dead_zone_early_exit",
+                                     "instrument": instrument})
+            return None
+        log.debug("[%s] Dead zone but %d open trade(s) — running management.",
+                  instrument, len(_open_in_history), extra={"run_id": run_id})
+
     if settings.get("news_filter_enabled", True):
         try:
             refresh_calendar()

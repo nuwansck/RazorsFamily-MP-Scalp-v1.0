@@ -133,8 +133,8 @@ def main():
     retention_days = int(settings.get('db_retention_days', 90))
 
     # Report schedule — configurable via settings.json
-    daily_report_hour    = int(settings.get('daily_report_hour_sgt',    15))
-    daily_report_minute  = int(settings.get('daily_report_minute_sgt',  30))
+    daily_report_hour    = int(settings.get('daily_report_hour_sgt',     4))  # 04:00 SGT — dead zone start
+    daily_report_minute  = int(settings.get('daily_report_minute_sgt',   0))
     weekly_report_hour   = int(settings.get('weekly_report_hour_sgt',    8))
     weekly_report_minute = int(settings.get('weekly_report_minute_sgt', 15))
     monthly_report_hour  = int(settings.get('monthly_report_hour_sgt',   8))
@@ -197,7 +197,7 @@ def main():
         coalesce=True,
     )
 
-    # Daily: Mon–Fri at daily_report_hour SGT (30 min before London open by default)
+    # Daily: Mon–Fri at daily_report_hour SGT (04:00 = dead zone start, full day captured)
     scheduler.add_job(
         send_daily_report,
         CronTrigger(day_of_week='mon-fri', hour=daily_report_hour,
