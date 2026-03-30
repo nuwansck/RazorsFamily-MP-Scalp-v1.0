@@ -156,7 +156,8 @@ def _build_signal_checks(score, direction, rr_ratio=None, tp_pct=None,
     mandatory_checks = [
         (f"Score >= {signal_threshold}",
          score >= signal_threshold and direction != "NONE", f"{score}/6"),
-        ("RR >= 2", None if rr_ratio is None else rr_ratio >= 2.0,
+        (_min_rr := float((settings or {}).get("min_rr_ratio", 1.8))),
+        (f"RR >= {_min_rr:.1f}", None if rr_ratio is None else rr_ratio >= _min_rr,
          "n/a" if rr_ratio is None else f"{rr_ratio:.2f}"),
     ]
     quality_checks = [

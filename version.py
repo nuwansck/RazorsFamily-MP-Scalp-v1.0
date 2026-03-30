@@ -1,2 +1,2 @@
-VERSION     = "1.9.1"
-DESCRIPTION = "RF MP Scalp v1.9 — docs updated, SETTINGS/README/CONFLUENCE reflect current state"
+VERSION     = "1.9.2"
+DESCRIPTION = "RF MP Scalp v1.9.2 — alert threshold 3→4, RR check reads min_rr_ratio setting"

@@ -1,5 +1,5 @@
 {
-  "bot_name": "RF MP Scalp v1.9",
+  "bot_name": "RF MP Scalp v1.9.2",
   "demo_mode": true,
   "enabled": true,
   "_comment_pairs": "Per-pair settings override any matching global key for that pair's cycle.",
@@ -135,7 +135,7 @@
   "exhaustion_atr_mult": 3.0,
   "orb_fresh_minutes": 60,
   "orb_aging_minutes": 120,
-  "min_rr_ratio": 2.0,
+  "min_rr_ratio": 1.8,
   "ema_fast_period": 9,
   "ema_slow_period": 21,
   "orb_formation_minutes": 15,
@@ -191,5 +191,5 @@
     }
   },
   "min_trade_units": 1000,
-  "telegram_min_score_alert": 3
+  "telegram_min_score_alert": 4
 }

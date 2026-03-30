@@ -146,7 +146,7 @@ def load_settings() -> dict:
     # v1.2.6: new parameterized keys — ORB decay, EMA periods, RR floor
     settings.setdefault('orb_fresh_minutes',         60)
     settings.setdefault('orb_aging_minutes',         120)
-    settings.setdefault('min_rr_ratio',              2.0)
+    settings.setdefault('min_rr_ratio',              1.8)  # 1.8 covers EUR/USD 1.90x RR
     settings.setdefault('ema_fast_period',           9)
     settings.setdefault('ema_slow_period',           21)
     settings.setdefault('orb_formation_minutes',     15)
