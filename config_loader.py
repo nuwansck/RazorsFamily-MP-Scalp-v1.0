@@ -147,6 +147,10 @@ def load_settings() -> dict:
     settings.setdefault('orb_fresh_minutes',         60)
     settings.setdefault('orb_aging_minutes',         120)
     settings.setdefault('min_rr_ratio',              1.8)  # 1.8 covers EUR/USD 1.90x RR
+    # v2.0: H1 trend filter
+    settings.setdefault('h1_filter_enabled',        True)
+    settings.setdefault('h1_filter_mode',           'soft')  # 'soft'=observe only | 'strict'=block
+    settings.setdefault('h1_ema_period',            21)
     settings.setdefault('ema_fast_period',           9)
     settings.setdefault('ema_slow_period',           21)
     settings.setdefault('orb_formation_minutes',     15)

@@ -63,6 +63,7 @@ def msg_signal_update(
     reason="", mandatory_checks=None, quality_checks=None,
     execution_checks=None, cycle_minutes=5, signal_threshold=4,
     setup="", orb_age_min=None, orb_formed=False,
+    h1_trend="UNKNOWN", h1_aligned=True, h1_filter_mode="soft",
 ) -> str:
     bot, pair = _split_banner(banner)
     s_str = f"{score}/6"
@@ -70,6 +71,14 @@ def msg_signal_update(
         s_str += f" (raw {raw_score}, news {news_penalty:+d})"
     di    = _dir_icon(direction)
     nline = f"⚠️  News penalty: {news_penalty:+d}\n" if news_penalty else ""
+
+    # H1 trend line — shows on all cards when filter is enabled
+    def _h1_line():
+        if h1_trend in ("UNKNOWN", "DISABLED"): return ""
+        icon   = "🟢" if h1_trend == "BULLISH" else ("🔴" if h1_trend == "BEARISH" else "⬜")
+        align  = "aligned" if h1_aligned else "counter-trend ⚠️"
+        mode   = " [soft]" if h1_filter_mode == "soft" else ""
+        return f"H1: {icon} {h1_trend}  ({align}){mode}\n"
 
     if decision == "WATCHING":
         orb = ""
@@ -80,6 +89,7 @@ def msg_signal_update(
             f"{banner}\n{_DIV}\n"
             f"{pair}  {di} {direction}  Score {s_str}  👁 Watching\n"
             f"Reason: {reason or 'Watching for setup'}\n"
+            f"{_h1_line()}"
             f"{nline}"
             f"{_DIV}\n"
             f"{orb}CPR: {cpr_width_pct:.2f}% width\n"
@@ -91,6 +101,7 @@ def msg_signal_update(
             f"{banner}\n{_DIV}\n"
             f"{pair}  {di} {direction}  Score {s_str}  ❌ Blocked\n"
             f"Reason: {reason}\n"
+            f"{_h1_line()}"
             f"{nline}"
             f"Next cycle in {cycle_minutes} min"
         )
@@ -105,6 +116,7 @@ def msg_signal_update(
         f"{banner}\n{_DIV}\n"
         f"{pair}  {di} {direction}  Score {s_str}  ✅ Ready\n"
         f"Window: {session}  |  CPR: {cpr_width_pct:.2f}% width\n"
+        f"{_h1_line()}"
         f"{nline}"
         f"{_DIV}\n"
         f"{spread}{margin}"
@@ -121,6 +133,7 @@ def msg_trade_opened(
     news_penalty=0, raw_score=None, free_margin=None,
     required_margin=None, margin_mode="NORMAL", margin_usage_pct=None,
     price_dp=5, tp2_rr=3.0,
+    h1_trend="UNKNOWN", h1_aligned=True,
 ) -> str:
     bot, pair = _split_banner(banner)
     mode = "DEMO" if demo else "LIVE"
@@ -151,7 +164,9 @@ def msg_trade_opened(
         f"{_DIV}\n"
         f"Setup:   {setup}\n"
         f"Score:   {s_str}  |  Spread: {spread_pips}p\n"
-        f"Units:   {units_fmt}  |  Risk: {_pos_label(position_usd)}  |  Mode: {mode}"
+        + (f"H1:      {'🟢' if h1_aligned else '🔴'} {h1_trend}  ({'aligned' if h1_aligned else 'counter-trend ⚠️'})\n"
+           if h1_trend not in ('UNKNOWN', 'DISABLED') else "")
+        + f"Units:   {units_fmt}  |  Risk: {_pos_label(position_usd)}  |  Mode: {mode}"
     )
 
 
@@ -372,12 +387,14 @@ def msg_startup(
     tokyo_start=8, tokyo_end=15, london_start=16, london_end=20,
     us_start=21, us_end=23, max_total_open=2,
     position_full_usd=30, position_partial_usd=20, session_thresholds=None,
-    tg_min_score=4,
+    tg_min_score=4, h1_filter_enabled=True, h1_filter_mode="soft",
 ) -> str:
     thr     = session_thresholds or {}
     lon_thr = thr.get("London", min_score)
     us_thr  = thr.get("US",     min_score)
     tok_thr = thr.get("Tokyo",  min_score + 1)
+    h1_line = (f"H1 filter: {'✅' if h1_filter_enabled else '⬜'} "
+               f"{h1_filter_mode.upper() if h1_filter_enabled else 'OFF'}\n")
     return (
         f"🚀 {version} started\n{_DIV}\n"
         f"Mode:      {mode}  |  Balance: ${balance:,.2f}\n"
@@ -385,6 +402,7 @@ def msg_startup(
         f"Strategy:  M5 EMA + ORB + CPR  |  Cycle: {cycle_minutes} min\n"
         f"Min score: {min_score}/6  |  Alerts: score ≥{tg_min_score} only\n"
         f"Sizes:     ${position_partial_usd} (score 4)  |  ${position_full_usd} (score 5–6)\n"
+        f"{h1_line}"
         f"{_DIV}\n"
         f"Sessions (SGT)\n"
         f"  ✈️  {dead_zone_start:02d}:00–{dead_zone_end:02d}:59  Dead zone\n"

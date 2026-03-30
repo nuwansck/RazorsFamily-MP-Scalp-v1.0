@@ -259,3 +259,35 @@ Used for the exhaustion penalty — prevents trading when price is over-stretche
 "loss_streak_cooldown_min": 30, ← raise to 45 if streaks persist
 "sl_reentry_gap_min": 5         ← raise to 10 to slow re-entry after SL
 ```
+
+---
+
+## H1 Trend Filter (v2.0)
+
+Controls the H1 trend filter. Observes in soft mode, blocks in strict mode.
+
+| Key | Default | Description |
+|---|---|---|
+| `h1_filter_enabled` | `true` | Set `false` to disable entirely — bot behaves as v1.9 |
+| `h1_filter_mode` | `"soft"` | `"soft"` = log and display H1 state, never block. `"strict"` = block counter-trend trades. Flip to `"strict"` once soft mode data confirms the filter helps. |
+| `h1_ema_period` | `21` | H1 EMA period for trend direction. EMA21 is standard; don't change without data. |
+
+**What H1 aligned means:**
+- BUY signal requires H1 price > H1 EMA21 (BULLISH)
+- SELL signal requires H1 price < H1 EMA21 (BEARISH)
+- FLAT / UNKNOWN → treated as aligned (no block)
+
+**To flip strict mode:** change `h1_filter_mode` from `"soft"` to `"strict"` in
+`settings.json` and redeploy. No code change needed.
+
+---
+
+## /export Command (v2.0)
+
+Send `/export` to your Telegram bot to receive `trade_history.json` as a file.
+Works from any device. Share the file for post-trade analysis.
+
+The export includes all fields per trade:
+`instrument`, `direction`, `score`, `session`, `setup`, `entry`, `sl_price`,
+`tp_price`, `realized_pnl_usd`, `h1_trend`, `h1_aligned`, `timestamp_sgt`
+

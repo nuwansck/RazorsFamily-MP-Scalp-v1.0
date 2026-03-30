@@ -14,7 +14,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from bot import run_bot_cycle
 from oanda_trader import OandaTrader
 from reporting import send_daily_report, send_weekly_report, send_monthly_report
-from telegram_alert import TelegramAlert
+from telegram_alert import TelegramAlert, start_command_listener
 from telegram_templates import msg_startup
 from config_loader import DATA_DIR, load_settings
 from database import Database
@@ -260,7 +260,6 @@ def main():
         _suppress   = (_now_ts - _last_start) < _suppress_secs
 
         if not _suppress:
-            _tg_min = int(settings.get('telegram_min_score_alert', 4))
             _alert.send(msg_startup(
                 _version, _mode, _balance, _threshold,
                 cycle_minutes=int(settings.get('cycle_minutes', 5)),
@@ -279,11 +278,15 @@ def main():
                 us_start=int(settings.get('us_session_start_hour', 21)),
                 us_end=int(settings.get('us_session_end_hour', 23)),
                 max_total_open=int(settings.get('max_total_open_trades', 2)),
-                tg_min_score=_tg_min,
+                tg_min_score=int(settings.get('telegram_min_score_alert', 4)),
+                h1_filter_enabled=bool(settings.get('h1_filter_enabled', True)),
+                h1_filter_mode=settings.get('h1_filter_mode', 'soft'),
             ))
             _state["last_startup_ts"] = _now_ts
             save_json(RUNTIME_STATE_FILE, _state)
             logger.info("Startup Telegram sent.")
+            # v2.0: start /export command listener
+            start_command_listener(_alert)
         else:
             logger.info(
                 "Startup Telegram suppressed — last sent %.0fs ago (dedup window 90s).",

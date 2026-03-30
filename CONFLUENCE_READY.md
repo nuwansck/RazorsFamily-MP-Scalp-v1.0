@@ -1,6 +1,6 @@
-# RF MP Scalp v1.9 — Technical Specification & Operations Wiki
+# RF MP Scalp v2.0 — Technical Specification & Operations Wiki
 
-**Bot Name:** RF MP Scalp v1.9
+**Bot Name:** RF MP Scalp v2.0
 **Instruments:** GBP/USD, EUR/USD, GBP/JPY, USD/JPY
 **Exchange:** OANDA (practice & live)
 **Deployment:** Railway (PaaS)
@@ -12,7 +12,7 @@
 
 ## 1. Purpose & Scope
 
-RF MP Scalp v1.9 is a fully automated 5-minute scalping bot for four forex pairs.
+RF MP Scalp v2.0 is a fully automated 5-minute scalping bot for four forex pairs.
 It uses a three-layer signal engine (EMA crossover + ORB + CPR bias) scored 0–6/6,
 with minimum thresholds per session. All configuration lives in `settings.json`.
 
@@ -197,4 +197,5 @@ Alert suppression: WATCHING cards for score < `telegram_min_score_alert` (defaul
 | v1.7.1b | Telegram alert suppression (score <3 silenced) |
 | v1.8 | AtomicFX-style Telegram templates, dead zone API skip |
 | v1.8.1 | EOD report 04:00 SGT, session breakdown, By Pair weekly |
-| **v1.9** | **Correct session order in startup card. Full clean release.** |
+| v1.9 | Correct session order in startup card |
+| **v2.0** | **H1 trend filter (soft/strict mode), /export Telegram command** |

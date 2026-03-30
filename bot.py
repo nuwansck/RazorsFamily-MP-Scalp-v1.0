@@ -156,8 +156,7 @@ def _build_signal_checks(score, direction, rr_ratio=None, tp_pct=None,
     mandatory_checks = [
         (f"Score >= {signal_threshold}",
          score >= signal_threshold and direction != "NONE", f"{score}/6"),
-        (_min_rr := float((settings or {}).get("min_rr_ratio", 1.8))),
-        (f"RR >= {_min_rr:.1f}", None if rr_ratio is None else rr_ratio >= _min_rr,
+        ("RR >= 2", None if rr_ratio is None else rr_ratio >= 2.0,
          "n/a" if rr_ratio is None else f"{rr_ratio:.2f}"),
     ]
     quality_checks = [
@@ -1296,6 +1295,9 @@ def _signal_phase(db, run_id, settings, alert, trader, history,
             setup=levels.get("setup", ""),
             orb_age_min=levels.get("orb_age_min"),
             orb_formed=levels.get("orb_formed", False),
+            h1_trend=levels.get("h1_trend", "UNKNOWN"),
+            h1_aligned=levels.get("h1_aligned", True),
+            h1_filter_mode=settings.get("h1_filter_mode", "soft"),
             **payload,
         )
         if msg != sig_cache.get("last_signal_msg", ""):
@@ -1357,6 +1359,25 @@ def _signal_phase(db, run_id, settings, alert, trader, history,
         return None
 
     signal_blockers = list(levels.get("signal_blockers") or [])
+
+    # H1 strict block (v2.0) — only when h1_filter_mode = "strict"
+    _h1_mode    = settings.get("h1_filter_mode", "soft")
+    _h1_enabled = bool(settings.get("h1_filter_enabled", True))
+    _h1_trend   = levels.get("h1_trend", "UNKNOWN")
+    _h1_aligned = levels.get("h1_aligned", True)
+    if (_h1_enabled and _h1_mode == "strict" and
+            not _h1_aligned and _h1_trend not in ("UNKNOWN", "DISABLED", "FLAT")):
+        _h1_dir    = "bullish" if direction == "BUY" else "bearish"
+        _h1_reason = f"H1 {_h1_trend} — no {direction} until H1 turns {_h1_dir}"
+        _send_signal_update("BLOCKED", _h1_reason)
+        update_runtime_state(
+            last_cycle_finished=now_sgt.strftime("%Y-%m-%d %H:%M:%S"),
+            status="SKIPPED_H1_BLOCK", score=score, direction=direction)
+        db.finish_cycle(run_id, status="SKIPPED",
+                        summary={"stage": "h1_filter", "reason": _h1_reason,
+                                 "instrument": instrument})
+        return None
+
     if signal_blockers:
         _send_signal_update("BLOCKED", signal_blockers[0],
                             {"rr_ratio": rr_ratio, "tp_pct": tp_pct,
@@ -1543,6 +1564,8 @@ def _execution_phase(db, run_id, settings, alert, trader, history,
         "tp_price":             tp_price,
         "size":                 units,
         "cpr_width_pct":        cpr_w,
+        "h1_trend":             levels.get("h1_trend", "UNKNOWN"),
+        "h1_aligned":           levels.get("h1_aligned", True),
         "sl_usd":               round(sl_usd, dp + 2),
         "tp_usd":               round(tp_usd, dp + 2),
         "pip_size":             pip,

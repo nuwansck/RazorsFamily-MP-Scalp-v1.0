@@ -1,8 +1,8 @@
-# RF MP Scalp v1.9 — M5 Forex Scalping Bot
+# RF MP Scalp v2.0 — M5 Forex Scalping Bot
 
 > **Deployed on Railway · OANDA API · Telegram Alerts**
 
-RF MP Scalp v1.9 is an automated multi-pair M5 scalping bot trading **GBP/USD, EUR/USD, GBP/JPY, USD/JPY** on OANDA demo.
+RF MP Scalp v2.0 is an automated multi-pair M5 scalping bot trading **GBP/USD, EUR/USD, GBP/JPY, USD/JPY** on OANDA demo.
 Strategy: EMA 9/21 crossover + Opening Range Breakout (ORB) + CPR pivot bias scored 1–6/6.
 Minimum score to trade: 4/6 (London/US), 5/6 (Tokyo).
 
@@ -24,7 +24,7 @@ Minimum score to trade: 4/6 (London/US), 5/6 (Tokyo).
 
 ## Strategy Overview
 
-RF MP Scalp v1.9 operates on **M5 (5-minute) candles** and runs a 5-minute cycle.
+RF MP Scalp v2.0 operates on **M5 (5-minute) candles** and runs a 5-minute cycle.
 Every cycle the signal engine evaluates three components and scores them 0–6:
 
 | Component | Points | Condition |
@@ -97,7 +97,7 @@ See `SETTINGS.md` for the full key reference.
 Key settings in `settings.json`:
 ```json
 {
-  "bot_name":              "RF MP Scalp v1.9",
+  "bot_name":              "RF MP Scalp v2.0",
   "position_full_usd":     30,
   "position_partial_usd":  20,
   "max_total_open_trades": 2,
@@ -119,7 +119,7 @@ Key settings in `settings.json`:
 
 ## Railway Deployment
 
-1. Push the `RF MP Scalp v1.9` folder to a GitHub repository
+1. Push the `RF MP Scalp v2.0` folder to a GitHub repository
 2. Connect to Railway → New Project → Deploy from GitHub
 3. Set environment variables (see below)
 4. Add a persistent volume mounted at `/data`
@@ -142,7 +142,7 @@ Key settings in `settings.json`:
 ## File Structure
 
 ```
-RF MP Scalp v1.9/
+RF MP Scalp v2.0/
 ├── scheduler.py          # APScheduler — main entry point
 ├── bot.py                # Trade cycle logic per pair
 ├── signals.py            # EMA + ORB + CPR signal engine

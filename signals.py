@@ -372,6 +372,21 @@ class SignalEngine:
         tp_pips = round(tp_usd_rec / _pip_size)
 
         # -- 8. Levels dict ---------------------------------------------------
+        # -- H1 trend filter (v2.0) ----------------------------------------
+        _h1_enabled = bool((settings or {}).get("h1_filter_enabled", True))
+        _h1_period  = int((settings or {}).get("h1_ema_period", 21))
+        if _h1_enabled:
+            _h1 = self._get_h1_trend(instrument, _h1_period, _dp)
+        else:
+            _h1 = {"h1_trend": "DISABLED", "h1_ema_now": None, "h1_price": None}
+
+        # H1 alignment: BUY needs BULLISH, SELL needs BEARISH
+        _h1_aligned = (
+            (_h1["h1_trend"] == "BULLISH" and direction == "BUY") or
+            (_h1["h1_trend"] == "BEARISH" and direction == "SELL") or
+            _h1["h1_trend"] in ("UNKNOWN", "DISABLED", "FLAT")
+        )
+
         levels["score"]        = score
         levels["position_usd"] = position_usd
         levels["entry"]        = round(entry, _dp)
@@ -389,6 +404,9 @@ class SignalEngine:
         levels["mandatory_checks"] = {"score_ok": score >= _min_score, "rr_ok": not rr_skip}
         levels["quality_checks"]   = {"tp_ok": True}
         levels["signal_blockers"]  = blockers
+        levels["h1_trend"]         = _h1["h1_trend"]
+        levels["h1_ema_now"]       = _h1["h1_ema_now"]
+        levels["h1_aligned"]       = _h1_aligned
 
         # Label for log line — works for both fixed_pips and percentage modes
         if sl_source == "fixed_pips":
@@ -536,6 +554,43 @@ class SignalEngine:
         return None, None, False
 
     # -- EMA helper -----------------------------------------------------------
+
+    def _get_h1_trend(self, instrument: str, ema_period: int = 21, dp: int = 5) -> dict:
+        """Fetch last 40 H1 candles and compute EMA trend direction.
+
+        Returns dict with keys:
+          h1_trend   : 'BULLISH' | 'BEARISH' | 'FLAT' | 'UNKNOWN'
+          h1_ema_now : float | None
+          h1_price   : float | None
+        """
+        try:
+            closes, _, _ = self._fetch_candles(instrument, "H1", 40)
+            if len(closes) < ema_period + 2:
+                return {"h1_trend": "UNKNOWN", "h1_ema_now": None, "h1_price": None}
+
+            ema_series = self._ema_series(closes[:-1], ema_period)
+            if len(ema_series) < 2:
+                return {"h1_trend": "UNKNOWN", "h1_ema_now": None, "h1_price": None}
+
+            ema_now   = ema_series[-1]
+            price_now = closes[-1]
+
+            if price_now > ema_now:
+                trend = "BULLISH"
+            elif price_now < ema_now:
+                trend = "BEARISH"
+            else:
+                trend = "FLAT"
+
+            return {
+                "h1_trend":   trend,
+                "h1_ema_now": round(ema_now,   dp),
+                "h1_price":   round(price_now, dp),
+            }
+        except Exception as exc:
+            import logging as _log
+            _log.getLogger(__name__).warning("H1 trend fetch failed: %s", exc)
+            return {"h1_trend": "UNKNOWN", "h1_ema_now": None, "h1_price": None}
 
     def _ema_series(self, closes: list, period: int) -> list:
         if len(closes) < period:
