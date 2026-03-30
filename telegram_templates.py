@@ -372,6 +372,7 @@ def msg_startup(
     tokyo_start=8, tokyo_end=15, london_start=16, london_end=20,
     us_start=21, us_end=23, max_total_open=2,
     position_full_usd=30, position_partial_usd=20, session_thresholds=None,
+    tg_min_score=4,
 ) -> str:
     thr     = session_thresholds or {}
     lon_thr = thr.get("London", min_score)
@@ -382,7 +383,7 @@ def msg_startup(
         f"Mode:      {mode}  |  Balance: ${balance:,.2f}\n"
         f"Pairs:     GBP/USD, EUR/USD, GBP/JPY, USD/JPY\n"
         f"Strategy:  M5 EMA + ORB + CPR  |  Cycle: {cycle_minutes} min\n"
-        f"Min score: {min_score}/6  |  Alerts: score ≥3 only\n"
+        f"Min score: {min_score}/6  |  Alerts: score ≥{tg_min_score} only\n"
         f"Sizes:     ${position_partial_usd} (score 4)  |  ${position_full_usd} (score 5–6)\n"
         f"{_DIV}\n"
         f"Sessions (SGT)\n"

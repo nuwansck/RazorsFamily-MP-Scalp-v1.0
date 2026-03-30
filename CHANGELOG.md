@@ -2,6 +2,47 @@
 
 ---
 
+## v1.9.2 — 2026-03-30
+
+### 🔇 Fix — Alert threshold raised 3 → 4 (`settings.json`, `config_loader.py`)
+
+**Problem:** Score 3/6 WATCHING cards were re-sending every 5 minutes because
+the ORB age counter (20min → 25min → 30min...) changed the message text each
+cycle, breaking the dedup cache. This flooded Telegram with repetitive noise
+for USD/JPY and EUR/USD during Tokyo session.
+
+**Fix:** `telegram_min_score_alert` raised from **3 → 4**.
+
+| Score | Before | After |
+|---|---|---|
+| 1–3/6 | Sent (noisy) | 🔇 Silent |
+| 4–6/6 | Sent ✅ | Sent ✅ |
+
+Score 4 is the trade threshold — alerting below it serves no purpose.
+
+---
+
+### 🔴 Fix — EUR/USD permanently blocked by hardcoded RR check (`bot.py`, `config_loader.py`)
+
+**Problem:** The mandatory RR check in `_build_signal_checks()` was hardcoded at
+`rr_ratio >= 2.0`. EUR/USD has SL=20p TP=38p = **1.90× RR**, which always failed
+the check. Every EUR/USD signal was blocked even at score 5/6, regardless of
+`min_rr_ratio` in settings.
+
+**Evidence:** Live Telegram showed `EUR/USD BUY Score 5/6 ❌ Blocked — R:R 1.90 < 1:2.0`
+
+**Fix:** RR check now reads `min_rr_ratio` from settings (default **1.8**).
+
+| | Before | After |
+|---|---|---|
+| RR threshold | Hardcoded 2.0 | Reads `min_rr_ratio` (1.8) |
+| EUR/USD 1.90× | ❌ Always blocked | ✅ Passes |
+| GBP/USD 2.50× | ✅ | ✅ |
+| GBP/JPY 2.51× | ✅ | ✅ |
+| USD/JPY 2.50× | ✅ | ✅ |
+
+---
+
 ## v1.7.1 patch — Telegram Alert Suppression
 
 ### 🔇 Feature — Suppress Low-Score WATCHING Alerts (`bot.py`, `settings.json`)

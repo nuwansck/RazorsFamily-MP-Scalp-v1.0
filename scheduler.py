@@ -260,6 +260,7 @@ def main():
         _suppress   = (_now_ts - _last_start) < _suppress_secs
 
         if not _suppress:
+            _tg_min = int(settings.get('telegram_min_score_alert', 4))
             _alert.send(msg_startup(
                 _version, _mode, _balance, _threshold,
                 cycle_minutes=int(settings.get('cycle_minutes', 5)),
@@ -278,6 +279,7 @@ def main():
                 us_start=int(settings.get('us_session_start_hour', 21)),
                 us_end=int(settings.get('us_session_end_hour', 23)),
                 max_total_open=int(settings.get('max_total_open_trades', 2)),
+                tg_min_score=_tg_min,
             ))
             _state["last_startup_ts"] = _now_ts
             save_json(RUNTIME_STATE_FILE, _state)
