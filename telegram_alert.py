@@ -3,15 +3,12 @@ Telegram Alert System — RF Scalp Bot v2.0
 
 Retries up to 3 times on 5xx errors with exponential backoff.
 HTTP 429 (rate-limit) respects the Retry-After header.
-4xx errors (bad token, bad chat_id) are NOT retried — they are config errors.
+4xx errors (bad token, bad chat_id) are NOT retried — config errors.
 
-v2.0: Added send_document() for /export command and start_command_listener()
-polling thread that responds to /export by sending trade_history.json.
+v2.0: send_document() added for scheduled weekly trade history export.
 """
-import json
 import logging
 import os
-import threading
 import time
 from pathlib import Path
 
@@ -24,7 +21,6 @@ log = logging.getLogger(__name__)
 _MAX_RETRIES  = 3
 _RETRY_DELAYS = (2, 5)
 
-# Data directory — matches state_utils.DATA_DIR
 _DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 
 
@@ -70,12 +66,14 @@ class TelegramAlert:
                     log.warning("Telegram %s (no retry): %s", r.status_code, r.text[:200])
                     return False
 
-                log.warning("Telegram 5xx (attempt %d/%d): HTTP %s", attempt + 1, _MAX_RETRIES, r.status_code)
+                log.warning("Telegram 5xx (attempt %d/%d): HTTP %s",
+                            attempt + 1, _MAX_RETRIES, r.status_code)
                 if attempt < len(_RETRY_DELAYS):
                     time.sleep(_RETRY_DELAYS[attempt])
 
             except requests.RequestException as exc:
-                log.warning("Telegram network error (attempt %d/%d): %s", attempt + 1, _MAX_RETRIES, exc)
+                log.warning("Telegram network error (attempt %d/%d): %s",
+                            attempt + 1, _MAX_RETRIES, exc)
                 if attempt < len(_RETRY_DELAYS):
                     time.sleep(_RETRY_DELAYS[attempt])
 
@@ -103,85 +101,9 @@ class TelegramAlert:
             if r.status_code == 200:
                 log.info("Telegram document sent: %s", file_path.name)
                 return True
-            log.warning("Telegram document failed: HTTP %s: %s", r.status_code, r.text[:200])
+            log.warning("Telegram document failed: HTTP %s: %s",
+                        r.status_code, r.text[:200])
             return False
         except Exception as exc:
             log.warning("Telegram document error: %s", exc)
             return False
-
-
-def _handle_export(alert: "TelegramAlert") -> None:
-    """Read trade_history.json and send as file attachment."""
-    history_file = _DATA_DIR / "trade_history.json"
-    if not history_file.exists():
-        alert.send("No trade history found on volume.")
-        return
-    try:
-        trades = json.loads(history_file.read_text(encoding="utf-8"))
-        filled = [t for t in trades if isinstance(t, dict) and t.get("status") == "FILLED"]
-        caption = (
-            f"trade_history.json\n"
-            f"{len(trades)} total records  |  {len(filled)} filled trades"
-        )
-        ok = alert.send_document(history_file, caption=caption)
-        if not ok:
-            alert.send("Export failed — could not send file. Check logs.")
-    except Exception as exc:
-        log.warning("Export error: %s", exc)
-        alert.send(f"Export error: {exc}")
-
-
-def start_command_listener(alert: "TelegramAlert | None" = None) -> None:
-    """
-    Start a background polling thread that listens for Telegram commands.
-    Supported commands:
-      /export  — sends trade_history.json as a file attachment
-
-    Security: only responds to messages from the configured TELEGRAM_CHAT_ID.
-    Polls getUpdates every 30 seconds using long-polling offset.
-    """
-    if alert is None:
-        alert = TelegramAlert()
-    if not alert.token or not alert.chat_id:
-        log.warning("Command listener: Telegram not configured — skipping.")
-        return
-
-    def _poll():
-        offset   = None
-        poll_url = f"https://api.telegram.org/bot{alert.token}/getUpdates"
-        log.info("Telegram command listener started — polling for /export")
-
-        while True:
-            try:
-                params = {"timeout": 25, "allowed_updates": ["message"]}
-                if offset is not None:
-                    params["offset"] = offset
-
-                r = requests.get(poll_url, params=params, timeout=35)
-                if r.status_code != 200:
-                    log.warning("getUpdates HTTP %s", r.status_code)
-                    time.sleep(30)
-                    continue
-
-                updates = r.json().get("result", [])
-                for upd in updates:
-                    offset = upd["update_id"] + 1
-                    msg    = upd.get("message", {})
-                    text   = msg.get("text", "").strip().lower()
-                    chat   = str(msg.get("chat", {}).get("id", ""))
-
-                    if chat != str(alert.chat_id):
-                        continue
-
-                    if text.startswith("/export"):
-                        log.info("Received /export — sending trade_history.json")
-                        _handle_export(alert)
-
-            except Exception as exc:
-                log.warning("Command listener error: %s", exc)
-
-            time.sleep(30)
-
-    t = threading.Thread(target=_poll, daemon=True, name="telegram-cmd-listener")
-    t.start()
-    log.info("Telegram /export command listener thread started.")

@@ -1,2 +1,2 @@
-VERSION     = "2.0.0"
-DESCRIPTION = "RF MP Scalp v2.0 — H1 trend filter (soft/strict), /export command"
+VERSION     = "2.0.1"
+DESCRIPTION = "RF MP Scalp v2.0.1 — weekly auto-export replaces /export polling"

@@ -419,6 +419,56 @@ def send_weekly_report() -> None:
         log.exception("send_weekly_report error: %s", exc)
 
 
+
+def send_weekly_export() -> None:
+    """Send trade_history.json as a Telegram file attachment every Monday 08:20 SGT.
+
+    Fires 5 minutes after the weekly performance report (08:15 SGT) so the
+    text report arrives first, then the raw data file follows.
+
+    The exported file contains all trade records including v2.0 H1 trend fields:
+    h1_trend, h1_aligned — used for post-trade analysis of the H1 filter.
+    """
+    try:
+        from pathlib import Path
+        import os
+
+        data_dir     = Path(os.getenv("DATA_DIR", "/data"))
+        history_file = data_dir / "trade_history.json"
+        alert        = TelegramAlert()
+
+        if not history_file.exists():
+            log.warning("send_weekly_export: trade_history.json not found.")
+            alert.send("📎 Weekly export: no trade history found on volume.")
+            return
+
+        now    = datetime.now(SGT)
+        filled = _filled(_load_history())
+
+        # Count H1 filter stats this week for the caption
+        pw_start, pw_end, pw_label = _prior_week_window(now)
+        pw_trades = _trades_in_window(filled, pw_start, pw_end)
+        h1_counter  = sum(1 for t in pw_trades if not t.get("h1_aligned", True))
+        h1_aligned  = sum(1 for t in pw_trades if t.get("h1_aligned", True))
+        all_trades  = len(_load_history())
+
+        caption = (
+            f"trade_history.json — {pw_label}\n"
+            f"{all_trades} total records  |  {len(filled)} filled trades\n"
+            f"This week: {len(pw_trades)} trades  "
+            f"({h1_aligned} H1-aligned  /  {h1_counter} counter-trend)"
+        )
+
+        ok = alert.send_document(history_file, caption=caption)
+        if ok:
+            log.info("Weekly export sent: %d total records, %d this week.",
+                     all_trades, len(pw_trades))
+        else:
+            log.warning("Weekly export: send_document failed.")
+    except Exception as exc:
+        log.exception("send_weekly_export error: %s", exc)
+
+
 def send_monthly_report() -> None:
     """Send monthly performance report on the first Monday of each month at 08:00 SGT.
 

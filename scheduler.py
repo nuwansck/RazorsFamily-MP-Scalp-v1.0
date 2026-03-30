@@ -13,8 +13,8 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from bot import run_bot_cycle
 from oanda_trader import OandaTrader
-from reporting import send_daily_report, send_weekly_report, send_monthly_report
-from telegram_alert import TelegramAlert, start_command_listener
+from reporting import send_daily_report, send_weekly_report, send_monthly_report, send_weekly_export
+from telegram_alert import TelegramAlert
 from telegram_templates import msg_startup
 from config_loader import DATA_DIR, load_settings
 from database import Database
@@ -197,6 +197,17 @@ def main():
         coalesce=True,
     )
 
+    # Weekly export: Monday 08:20 SGT — 5 min after weekly report
+    scheduler.add_job(
+        send_weekly_export,
+        CronTrigger(day_of_week='mon', hour=weekly_report_hour,
+                    minute=weekly_report_minute + 5, timezone=SG_TZ),
+        id='weekly_export',
+        name='Weekly trade history export',
+        max_instances=1,
+        coalesce=True,
+    )
+
     # Daily: Mon–Fri at daily_report_hour SGT (04:00 = dead zone start, full day captured)
     scheduler.add_job(
         send_daily_report,
@@ -235,6 +246,8 @@ def main():
                 monthly_report_hour, monthly_report_minute)
     logger.info('  Weekly report  — every Monday at %02d:%02d SGT',
                 weekly_report_hour, weekly_report_minute)
+    logger.info('  Weekly export  — every Monday at %02d:%02d SGT (trade_history.json)',
+                weekly_report_hour, weekly_report_minute + 5)
     logger.info('  Daily report   — Mon–Fri at %02d:%02d SGT',
                 daily_report_hour, daily_report_minute)
 
@@ -285,8 +298,7 @@ def main():
             _state["last_startup_ts"] = _now_ts
             save_json(RUNTIME_STATE_FILE, _state)
             logger.info("Startup Telegram sent.")
-            # v2.0: start /export command listener
-            start_command_listener(_alert)
+            # weekly export runs via scheduler (Monday 08:20 SGT)
         else:
             logger.info(
                 "Startup Telegram suppressed — last sent %.0fs ago (dedup window 90s).",
